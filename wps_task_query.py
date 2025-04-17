@@ -11,12 +11,13 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def generate_html_content(data_df, title="今日待办任务", display_fields=None):
+def generate_html_content(data_df, title="今日待办任务", display_fields=None, additional_note=None):
     """
     根据数据动态生成HTML邮件内容
     :param data_df: 数据DataFrame
     :param title: 邮件标题
     :param display_fields: 需要显示的字段列表，如果为None则显示所有字段
+    :param additional_note: 补充说明内容，支持HTML格式
     :return: HTML内容
     """
     today = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -235,6 +236,30 @@ def generate_html_content(data_df, title="今日待办任务", display_fields=No
                 font-size: 16px;
                 margin-right: 5px;
             }}
+            
+            /* 补充说明区域样式 */
+            .additional-note {{
+                margin-top: 30px;
+                padding: 15px 20px;
+                background-color: #f8f9fa;
+                border-radius: 8px;
+                border-left: 4px solid #0078d7;
+            }}
+            
+            .additional-note a {{
+                display: inline;
+                padding: 0;
+                background: none;
+                color: #0078d7;
+                font-weight: 500;
+                text-decoration: underline;
+            }}
+            
+            .additional-note a:hover {{
+                text-decoration: underline;
+                background: none;
+                opacity: 0.8;
+            }}
         </style>
     </head>
     <body>
@@ -303,6 +328,14 @@ def generate_html_content(data_df, title="今日待办任务", display_fields=No
         html += """
                     </tbody>
                 </table>
+        """
+    
+    # 添加补充说明区域（如果有的话）
+    if additional_note:
+        html += f"""
+                <div class="additional-note">
+                    {additional_note}
+                </div>
         """
     
     html += """
@@ -411,11 +444,23 @@ def main():
         # ============ 这里定义邮件标题 ============
         email_title = "今日待办任务"
         
+        # ============ 这里定义补充说明内容 ============
+        # 如果不需要补充说明，设置为None
+        additional_note = """
+        <p>➡️如果您今天还没有写成功日记的话，快去添加吧！</p>
+        <p>⭐你应该72小时内完成你想做的的，否则就会失去做的斗志！</p>
+        <br>
+        <p>📋<a href="https://web.wps.cn/wo/sl/v317YHKz?app_id=1Cdn5GV4vlkQfZ2SbnB32v" target="_blank">添加成功日记</a></p>
+        <p>🎊<a href="https://web.wps.cn/wo/sl/v36Eucp?app_id=3dYIUhHwuh1ig7XqGoB2fg" target="_blank">日记视图</a></p>
+        <p>☄️<a href="https://www.kdocs.cn/wo/sl/v11ogNz0" target="_blank">日记仪表盘</a></p>
+        """
+        
         # 生成HTML内容
         html_content = generate_html_content(
             records_df, 
             title=email_title,
-            display_fields=display_fields
+            display_fields=display_fields,
+            additional_note=additional_note
         )
         
         # 发送邮件
