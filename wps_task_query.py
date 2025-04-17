@@ -17,44 +17,260 @@ def generate_html_content(tasks):
     :param tasks: 任务列表
     :return: HTML内容
     """
-    html = """
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    weekday = datetime.datetime.now().strftime("%A")
+    task_count = len(tasks)
+    
+    html = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>今日待办任务</title>
         <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 800px; margin: 0 auto; padding: 20px; }
-            h1 { color: #0078d7; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-            th { background-color: #f2f2f2; }
-            tr:hover { background-color: #f5f5f5; }
-            .no-tasks { color: #888; font-style: italic; }
-            a { color: #0078d7; text-decoration: none; }
-            a:hover { text-decoration: underline; }
-            .footer { margin-top: 30px; font-size: 12px; color: #888; }
+            @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+            
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+            
+            body {{ 
+                font-family: 'Roboto', 'Microsoft YaHei', Arial, sans-serif; 
+                line-height: 1.6; 
+                color: #333; 
+                background-color: #f9f9f9;
+                padding: 10px; 
+            }}
+            
+            .container {{ 
+                max-width: 800px; 
+                margin: 0 auto; 
+                background-color: #ffffff;
+                border-radius: 10px;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+                overflow: hidden;
+            }}
+            
+            .header {{
+                background: linear-gradient(135deg, #0078d7, #0053a6);
+                color: white;
+                padding: 20px;
+                position: relative;
+            }}
+            
+            .header h1 {{ 
+                margin-bottom: 10px; 
+                font-size: 22px;
+                font-weight: 500;
+            }}
+            
+            .date-info {{
+                display: flex;
+                align-items: center;
+                margin-bottom: 5px;
+                font-size: 14px;
+                opacity: 0.9;
+            }}
+            
+            .date-info .dot {{
+                display: inline-block;
+                margin: 0 8px;
+                width: 4px;
+                height: 4px;
+                border-radius: 50%;
+                background-color: rgba(255, 255, 255, 0.6);
+                vertical-align: middle;
+            }}
+            
+            .task-summary {{
+                background-color: white;
+                border-radius: 5px;
+                padding: 8px 12px;
+                margin-top: 15px;
+                display: inline-block;
+                font-size: 14px;
+                font-weight: 500;
+                color: #0078d7;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }}
+            
+            .content {{
+                padding: 20px;
+            }}
+            
+            .no-tasks {{ 
+                color: #888; 
+                font-style: italic;
+                text-align: center;
+                padding: 40px 0;
+                background-color: #f8f9fa;
+                border-radius: 6px;
+            }}
+            
+            .no-tasks i {{
+                display: block;
+                font-size: 40px;
+                margin-bottom: 10px;
+                color: #ccc;
+            }}
+            
+            table {{ 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin-top: 20px;
+                border-radius: 6px;
+                overflow: hidden;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+                table-layout: fixed;
+            }}
+            
+            thead {{
+                background-color: #f2f7fd;
+            }}
+            
+            th {{ 
+                padding: 12px 15px; 
+                text-align: left; 
+                font-weight: 500;
+                color: #0078d7;
+                border-bottom: 1px solid #eaeaea;
+            }}
+            
+            td {{ 
+                padding: 12px 15px; 
+                text-align: left; 
+                border-bottom: 1px solid #eaeaea;
+                vertical-align: middle;
+            }}
+            
+            tr:last-child td {{
+                border-bottom: none;
+            }}
+            
+            tr:hover {{ 
+                background-color: #f8f9fa; 
+            }}
+            
+            .task-content {{
+                font-weight: 400;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }}
+            
+            /* 在手机屏幕上允许任务内容在必要时折行 */
+            @media (max-width: 600px) {{
+                .task-content {{
+                    white-space: normal;
+                    word-break: break-word;
+                }}
+                
+                .task-content-wrapper {{
+                    display: block;
+                    max-width: 100%;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }}
+                
+                table {{
+                    font-size: 14px;
+                }}
+                
+                th, td {{
+                    padding: 10px;
+                }}
+                
+                .action-col {{
+                    width: auto !important;
+                }}
+                
+                a {{
+                    padding: 6px 10px !important;
+                }}
+            }}
+            
+            .index-col {{
+                width: 40px;
+                text-align: center;
+                color: #888;
+                font-weight: 500;
+            }}
+            
+            a {{ 
+                color: #0078d7; 
+                text-decoration: none;
+                padding: 8px 15px;
+                background-color: #f0f7ff;
+                border-radius: 4px;
+                transition: all 0.2s ease;
+                display: inline-block;
+                font-size: 14px;
+                white-space: nowrap;
+            }}
+            
+            a:hover {{ 
+                background-color: #e1efff;
+                text-decoration: none;
+            }}
+            
+            .action-col {{
+                width: 120px;
+                text-align: center;
+            }}
+            
+            .footer {{ 
+                margin-top: 20px; 
+                padding: 15px 0;
+                font-size: 13px; 
+                color: #888;
+                text-align: center;
+                border-top: 1px solid #eaeaea;
+            }}
+            
+            .icon {{
+                font-size: 16px;
+                margin-right: 5px;
+            }}
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>今日待办任务</h1>
-            <p>日期: """ + datetime.datetime.now().strftime("%Y-%m-%d") + """</p>
+            <div class="header">
+                <h1>今日待办任务</h1>
+                <div class="date-info">
+                    <span>{today}</span>
+                    <span class="dot"></span>
+                    <span>{weekday}</span>
+                </div>
+                <div class="task-summary">
+                    共 {task_count} 项待办
+                </div>
+            </div>
+            
+            <div class="content">
     """
     
     if not tasks or len(tasks) == 0:
         html += """
-            <p class="no-tasks">今天没有待办任务，好好休息吧！</p>
+                <div class="no-tasks">
+                    <i>✓</i>
+                    <p>今天没有待办任务，好好休息吧！</p>
+                </div>
         """
     else:
         html += """
-            <table>
-                <tr>
-                    <th>序号</th>
-                    <th>任务内容</th>
-                    <th>操作</th>
-                </tr>
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="index-col">#</th>
+                            <th>任务内容</th>
+                            <th class="action-col">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         """
         
         for i, task in enumerate(tasks):
@@ -62,27 +278,35 @@ def generate_html_content(tasks):
             task_link = task.get("task_link", "")
             
             html += f"""
-                <tr>
-                    <td>{i+1}</td>
-                    <td>{task_name}</td>
-                    <td>
+                        <tr>
+                            <td class="index-col">{i+1}</td>
+                            <td>
+                                <div class="task-content-wrapper">
+                                    <span class="task-content">{task_name}</span>
+                                </div>
+                            </td>
+                            <td class="action-col">
             """
             
             if task_link:
-                html += f'<a href="{task_link}" target="_blank">查看详情</a>'
+                html += f'<a href="{task_link}" target="_blank"><span class="icon">➔</span>查看</a>'
+            else:
+                html += '<span style="color:#ccc;">无链接</span>'
             
             html += """
-                    </td>
-                </tr>
+                            </td>
+                        </tr>
             """
         
         html += """
-            </table>
+                    </tbody>
+                </table>
         """
     
     html += """
-            <div class="footer">
-                <p>此邮件由WPS云文档自动发送，请勿回复。</p>
+                <div class="footer">
+                    <p>此邮件由WPS云文档自动发送，请勿回复。</p>
+                </div>
             </div>
         </div>
     </body>
