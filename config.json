@@ -1,0 +1,20 @@
+{
+  "email": {
+    "smtp_server": "",
+    "smtp_port": 465,
+    "smtp_user": "",
+    "smtp_password": "",
+    "to_addr": ""
+  },
+  "query": {
+    "field_names": {
+      "task_name": "今天要做什么事",
+      "task_link": "当前数据的链接"
+    },
+    "conditions": {
+      "date_field": "日期",
+      "task_flag_field": "任务标识",
+      "completion_field": "完成状态"
+    }
+  }
+} 
