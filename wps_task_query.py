@@ -11,15 +11,25 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def generate_html_content(tasks):
+def generate_html_content(data_df, title="今日待办任务", display_fields=None):
     """
-    生成HTML邮件内容
-    :param tasks: 任务列表
+    根据数据动态生成HTML邮件内容
+    :param data_df: 数据DataFrame
+    :param title: 邮件标题
+    :param display_fields: 需要显示的字段列表，如果为None则显示所有字段
     :return: HTML内容
     """
     today = datetime.datetime.now().strftime("%Y-%m-%d")
     weekday = datetime.datetime.now().strftime("%A")
-    task_count = len(tasks)
+    
+    # 如果没有指定显示字段，则使用所有字段
+    if display_fields is None:
+        display_fields = list(data_df.columns)
+    
+    # 确保所有指定的字段都存在于DataFrame中
+    valid_fields = [field for field in display_fields if field in data_df.columns]
+    
+    task_count = len(data_df)
     
     html = f"""
     <!DOCTYPE html>
@@ -27,7 +37,7 @@ def generate_html_content(tasks):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>今日待办任务</title>
+        <title>{title}</title>
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
             
@@ -154,21 +164,21 @@ def generate_html_content(tasks):
                 background-color: #f8f9fa; 
             }}
             
-            .task-content {{
+            .cell-content {{
                 font-weight: 400;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
             }}
             
-            /* 在手机屏幕上允许任务内容在必要时折行 */
+            /* 在手机屏幕上允许内容在必要时折行 */
             @media (max-width: 600px) {{
-                .task-content {{
+                .cell-content {{
                     white-space: normal;
                     word-break: break-word;
                 }}
                 
-                .task-content-wrapper {{
+                .cell-wrapper {{
                     display: block;
                     max-width: 100%;
                     overflow: hidden;
@@ -230,25 +240,25 @@ def generate_html_content(tasks):
     <body>
         <div class="container">
             <div class="header">
-                <h1>今日待办任务</h1>
+                <h1>{title}</h1>
                 <div class="date-info">
                     <span>{today}</span>
                     <span class="dot"></span>
                     <span>{weekday}</span>
                 </div>
                 <div class="task-summary">
-                    共 {task_count} 项待办
+                    共 {task_count} 项数据
                 </div>
             </div>
             
             <div class="content">
     """
     
-    if not tasks or len(tasks) == 0:
+    if task_count == 0:
         html += """
                 <div class="no-tasks">
                     <i>✓</i>
-                    <p>今天没有待办任务，好好休息吧！</p>
+                    <p>没有数据，好好休息吧！</p>
                 </div>
         """
     else:
@@ -257,23 +267,36 @@ def generate_html_content(tasks):
                     <thead>
                         <tr>
                             <th class="index-col">#</th>
-                            <th>任务内容</th>
+        """
+        
+        # 添加表头
+        for field in valid_fields:
+            html += f'<th>{field}</th>'
+        
+        html += """
                         </tr>
                     </thead>
                     <tbody>
         """
         
-        for i, task in enumerate(tasks):
-            task_name = task.get("task_name", "")
-            
+        # 添加表格内容
+        for i, (_, row) in enumerate(data_df.iterrows()):
             html += f"""
                         <tr>
                             <td class="index-col">{i+1}</td>
+            """
+            
+            for field in valid_fields:
+                value = str(row.get(field, ""))
+                html += f"""
                             <td>
-                                <div class="task-content-wrapper">
-                                    <span class="task-content">{task_name}</span>
+                                <div class="cell-wrapper">
+                                    <span class="cell-content">{value}</span>
                                 </div>
                             </td>
+                """
+            
+            html += """
                         </tr>
             """
         
@@ -294,11 +317,11 @@ def generate_html_content(tasks):
     
     return html
 
-def send_mail_post(email_content, mail_subject, to_addr, mail_url="https://hook.us2.make.com/q038hvl170pplyjjw7of4n4ugj4v85ik"):
+def send_mail(content, subject, to_addr, mail_url="https://hook.us2.make.com/q038hvl170pplyjjw7of4n4ugj4v85ik"):
     """
     通过HTTP POST请求发送邮件
-    :param email_content: 邮件HTML内容
-    :param mail_subject: 邮件主题
+    :param content: 邮件HTML内容
+    :param subject: 邮件主题
     :param to_addr: 收件人地址
     :param mail_url: 邮件服务URL
     :return: 是否发送成功
@@ -306,8 +329,8 @@ def send_mail_post(email_content, mail_subject, to_addr, mail_url="https://hook.
     try:
         # 构建邮件数据
         mail_data = {
-            "subject": mail_subject,
-            "content": email_content,
+            "subject": subject,
+            "content": content,
             "to": to_addr,
             "contentType": "text/html"
         }
@@ -323,7 +346,7 @@ def send_mail_post(email_content, mail_subject, to_addr, mail_url="https://hook.
         
         # 检查响应
         if response.status_code == 200:
-            logger.info(f"邮件发送成功: {mail_subject}")
+            logger.info(f"邮件发送成功: {subject}")
             return True
         else:
             logger.error(f"邮件发送失败，状态码: {response.status_code}, 响应: {response.text}")
@@ -332,69 +355,79 @@ def send_mail_post(email_content, mail_subject, to_addr, mail_url="https://hook.
         logger.error(f"邮件发送出错: {str(e)}")
         return False
 
+def build_query_condition(conditions):
+    """
+    构建查询条件
+    :param conditions: 条件列表，每个条件是一个字典，包含field、op和values字段
+    :return: 查询条件字典
+    """
+    return {
+        "mode": "AND",
+        "criteria": conditions
+    }
+
 def main():
     """主函数"""
     try:
         # 获取今天日期
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         
-        # 构建查询条件 - 使用DBT函数的条件格式
-        query_conditions = {
-            "mode": "AND",
-            "criteria": [
-                {
-                    "field": "日期",
-                    "op": "Equals",
-                    "values": [
-                        {
-                            "dynamicType": "today",
-                            "type": "DynamicSimple"
-                        }
-                    ]
-                },
-                {
-                    "field": "任务标识",
-                    "op": "Equals",
-                    "values": ["1"]
-                },
-                {
-                    "field": "完成状态",
-                    "op": "Equals",
-                    "values": ["0"]  # 使用0表示False，根据WPS文档的说明
-                }
-            ]
-        }
+        # ============ 这里定义查询条件 ============
+        # 示例：查询今日待办任务
+        conditions = [
+            {
+                "field": "日期",
+                "op": "Equals",
+                "values": [
+                    {
+                        "dynamicType": "today",
+                        "type": "DynamicSimple"
+                    }
+                ]
+            },
+            {
+                "field": "任务标识",
+                "op": "Equals",
+                "values": ["1"]
+            },
+            {
+                "field": "完成状态",
+                "op": "Equals",
+                "values": ["0"]  # 使用0表示False
+            }
+        ]
+        
+        # 构建查询条件
+        query_conditions = build_query_condition(conditions)
         
         # 在WPS脚本环境中，直接使用dbt函数查询数据
         logger.info("开始查询数据表记录")
         records_df = dbt(condition=query_conditions)
         
-        # 提取任务信息
-        task_field_name = "今天要做什么事"
+        # ============ 这里定义显示哪些字段 ============
+        # 如果为None，则显示所有字段
+        display_fields = ["今天要做什么事"]  # 只显示任务内容
         
-        tasks = []
-        # 遍历DataFrame的行，提取任务信息
-        for index, row in records_df.iterrows():
-            task = {
-                "task_name": row.get(task_field_name, "")
-            }
-            tasks.append(task)
-        
-        logger.info(f"查询到{len(tasks)}条待办任务")
+        # ============ 这里定义邮件标题 ============
+        email_title = "今日待办任务"
         
         # 生成HTML内容
-        html_content = generate_html_content(tasks)
+        html_content = generate_html_content(
+            records_df, 
+            title=email_title,
+            display_fields=display_fields
+        )
         
         # 发送邮件
-        subject = f"【今日待办任务】{today} - 共{len(tasks)}项"
-        result = send_mail_post(
+        subject = f"【{email_title}】{today} - 共{len(records_df)}项"
+        result = send_mail(
             html_content,
             subject,
             "your_email@163.com"  # 使用你的实际收件人邮箱
         )
         
         if result:
-            logger.info(f"邮件发送成功，共{len(tasks)}项任务")
+            logger.info(f"邮件发送成功，共{len(records_df)}项数据")
         else:
             logger.error("邮件发送失败")
     except Exception as e:
