@@ -183,10 +183,6 @@ def generate_html_content(tasks):
                     padding: 10px;
                 }}
                 
-                .action-col {{
-                    width: auto !important;
-                }}
-                
                 a {{
                     padding: 6px 10px !important;
                 }}
@@ -214,11 +210,6 @@ def generate_html_content(tasks):
             a:hover {{ 
                 background-color: #e1efff;
                 text-decoration: none;
-            }}
-            
-            .action-col {{
-                width: 120px;
-                text-align: center;
             }}
             
             .footer {{ 
@@ -267,7 +258,6 @@ def generate_html_content(tasks):
                         <tr>
                             <th class="index-col">#</th>
                             <th>任务内容</th>
-                            <th class="action-col">操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -275,7 +265,6 @@ def generate_html_content(tasks):
         
         for i, task in enumerate(tasks):
             task_name = task.get("task_name", "")
-            task_link = task.get("task_link", "")
             
             html += f"""
                         <tr>
@@ -284,16 +273,6 @@ def generate_html_content(tasks):
                                 <div class="task-content-wrapper">
                                     <span class="task-content">{task_name}</span>
                                 </div>
-                            </td>
-                            <td class="action-col">
-            """
-            
-            if task_link:
-                html += f'<a href="{task_link}" target="_blank"><span class="icon">➔</span>查看</a>'
-            else:
-                html += '<span style="color:#ccc;">无链接</span>'
-            
-            html += """
                             </td>
                         </tr>
             """
@@ -392,14 +371,12 @@ def main():
         
         # 提取任务信息
         task_field_name = "今天要做什么事"
-        task_link_field = "当前数据的链接"
         
         tasks = []
         # 遍历DataFrame的行，提取任务信息
         for index, row in records_df.iterrows():
             task = {
-                "task_name": row.get(task_field_name, ""),
-                "task_link": row.get(task_link_field, "")
+                "task_name": row.get(task_field_name, "")
             }
             tasks.append(task)
         
