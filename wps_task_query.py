@@ -1,15 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import pandas as pd
 import datetime
 import requests
-import json
-import logging
-
-# 配置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 def generate_html_content(data_df, title="今日待办任务", display_fields=None, additional_note=None):
     """
@@ -21,7 +14,19 @@ def generate_html_content(data_df, title="今日待办任务", display_fields=No
     :return: HTML内容
     """
     today = datetime.datetime.now().strftime("%Y-%m-%d")
-    weekday = datetime.datetime.now().strftime("%A")
+    
+    # 将英文星期转换为中文格式
+    weekday_num = datetime.datetime.now().weekday()
+    weekday_map = {
+        0: "周一",
+        1: "周二", 
+        2: "周三",
+        3: "周四",
+        4: "周五",
+        5: "周六",
+        6: "周日"
+    }
+    weekday = weekday_map[weekday_num]
     
     # 如果没有指定显示字段，则使用所有字段
     if display_fields is None:
@@ -379,13 +384,13 @@ def send_mail(content, subject, to_addr, mail_url="https://hook.us2.make.com/q03
         
         # 检查响应
         if response.status_code == 200:
-            logger.info(f"邮件发送成功: {subject}")
+            print(f"邮件发送成功: {subject}")
             return True
         else:
-            logger.error(f"邮件发送失败，状态码: {response.status_code}, 响应: {response.text}")
+            print(f"邮件发送失败，状态码: {response.status_code}, 响应: {response.text}")
             return False
     except Exception as e:
-        logger.error(f"邮件发送出错: {str(e)}")
+        print(f"邮件发送出错: {str(e)}")
         return False
 
 def build_query_condition(conditions):
@@ -434,8 +439,8 @@ def main():
         query_conditions = build_query_condition(conditions)
         
         # 在WPS脚本环境中，直接使用dbt函数查询数据
-        logger.info("开始查询数据表记录")
-        records_df = dbt(condition=query_conditions)
+        print("开始查询数据表记录")
+        records_df = dbt(sheet_name="成功日记(数据表)",condition=query_conditions)
         
         # ============ 这里定义显示哪些字段 ============
         # 如果为None，则显示所有字段
@@ -472,11 +477,13 @@ def main():
         )
         
         if result:
-            logger.info(f"邮件发送成功，共{len(records_df)}项数据")
+            print(f"邮件发送成功，共{len(records_df)}项数据")
         else:
-            logger.error("邮件发送失败")
+            print("邮件发送失败")
     except Exception as e:
-        logger.error(f"执行过程中出错: {str(e)}")
+        print(f"执行过程中出错: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
 
 if __name__ == "__main__":
     main() 
