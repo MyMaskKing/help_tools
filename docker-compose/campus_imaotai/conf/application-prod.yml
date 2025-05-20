@@ -1,22 +1,129 @@
 # Spring Boot 配置
 server:
   port: 8160
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    max-connections: 8192
+    accept-count: 100
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,text/css,application/javascript
 
 spring:
+  # 数据源配置
   datasource:
-    url: jdbc:mysql://mysql:3306/campus_imaotai?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=Asia/Shanghai&autoReconnect=true&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true
-    username: root
-    password: 123456789
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.zaxxer.hikari.HikariDataSource
+    # 动态数据源文档 https://www.kancloud.cn/tracy5546/dynamic-datasource/content
+    dynamic:
+      # 性能分析插件(有性能损耗 不建议生产环境使用)
+      p6spy: false
+      # 设置默认的数据源或者数据源组,默认值即为 master
+      primary: master
+      # 严格模式 匹配不到数据源则报错
+      strict: true
+      datasource:
+        # 主库数据源
+        master:
+          type: ${spring.datasource.type}
+          driverClassName: com.mysql.cj.jdbc.Driver
+          url: jdbc:mysql://127.0.0.1:3306/campus_imaotai?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&autoReconnect=true&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true
+          username: root
+          password: 123456789
+      hikari:
+        # 最大连接池数量
+        maxPoolSize: 20
+        # 最小空闲线程数量
+        minIdle: 10
+        # 配置获取连接等待超时的时间
+        connectionTimeout: 30000
+        # 校验超时时间
+        validationTimeout: 5000
+        # 空闲连接存活最大时间，默认10分钟
+        idleTimeout: 600000
+        # 此属性控制池中连接的最长生命周期，值0表示无限生命周期，默认30分钟
+        maxLifetime: 1800000
+        # 连接测试query（配置检测连接是否有效）
+        connectionTestQuery: SELECT 1
+        # 多久检查一次连接的活性
+        keepaliveTime: 30000
+
+  # Redis配置
   redis:
-    host: redis
+    host: 127.0.0.1
     port: 6379
     database: 0
-    # password:  # 如有密码请取消注释并填写
+    timeout: 10s
+    lettuce:
+      pool:
+        min-idle: 0
+        max-idle: 8
+        max-active: 8
+        max-wait: -1ms
+
+# Actuator配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+  health:
+    db:
+      enabled: true
+    redis:
+      enabled: true
+
+# MyBatis配置
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.oddfar.campus.business.domain
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
 
 # 日志配置
 logging:
   level:
-    root: info
+    com.oddfar.campus: info
+    org.springframework: warn
+  file:
+    path: /home/campus/logs
+
+# JWT配置
+jwt:
+  secret: your-secret-key
+  expiration: 7200000  # 2小时
+
+# 安全配置
+security:
+  # 排除路径
+  ignore:
+    urls:
+      - /api/auth/login
+      - /api/auth/logout
+      - /api/captcha
+      - /api/file/**
+      - /api/profile/**
+      - /api/actuator/**
+      - /swagger-ui.html
+      - /swagger-resources/**
+      - /webjars/**
+      - /*/api-docs
+      - /druid/**
+
+# 文件上传配置
+file:
+  upload:
+    path: /home/campus/upload/
+    allowed-types: jpg,jpeg,png,gif
+    max-size: 5MB
+
+# 缓存配置
+cache:
+  expire-time: 1800  # 30分钟
 
 # 其他自定义配置可根据实际需求补充 
