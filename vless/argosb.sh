@@ -56,8 +56,8 @@ fi
 
 # 下载订阅服务相关文件
 mkdir -p "$HOME/agsb/sub"
-curl -Ls "https://raw.githubusercontent.com/MyMaskKing/help_tools/refs/heads/main/vless/sub_server.py?token=GHSAT0AAAAAADCDRMSHP2EQWHQAEEPS34IW2CXVJXQ" -o "$HOME/agsb/sub_server.py"
-curl -Ls "https://raw.githubusercontent.com/MyMaskKing/help_tools/refs/heads/main/vless/manage_sub.sh?token=GHSAT0AAAAAADCDRMSHESYKUGUUQ6NEAEMK2CXVJLQ" -o "$HOME/agsb/manage_sub.sh"
+curl -Ls "https://raw.githubusercontent.com/MyMaskKing/help_tools/refs/heads/main/vless/sub_server.py" -o "$HOME/agsb/sub_server.py"
+curl -Ls "https://raw.githubusercontent.com/MyMaskKing/help_tools/refs/heads/main/vless/manage_sub.sh" -o "$HOME/agsb/manage_sub.sh"
 chmod +x "$HOME/agsb/manage_sub.sh"
 
 # 检查Python3和pip
