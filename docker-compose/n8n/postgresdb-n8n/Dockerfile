@@ -1,13 +1,10 @@
 FROM n8nio/n8n:latest
 
 # 设置时区为 Asia/Shanghai
-ENV TZ=Asia/Shanghai
-RUN apt-get update && \
-    apt-get install -y tzdata && \
-    ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
-    dpkg-reconfigure -f noninteractive tzdata && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache tzdata \
+    && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone \
+    && apk del tzdata
 
 # 配置环境变量
 ENV DB_TYPE=postgresdb \
@@ -18,4 +15,4 @@ ENV DB_TYPE=postgresdb \
     DB_POSTGRESDB_PASSWORD=cyj123456 \
     N8N_BASIC_AUTH_ACTIVE=true \
     N8N_BASIC_AUTH_USER=admin \
-    N8N_BASIC_AUTH_PASSWORD=cyj123456 \
+    N8N_BASIC_AUTH_PASSWORD=cyj123456

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# N8N 基础配置
+export N8N_ENCRYPTION_KEY="${N8N_ENCRYPTION_KEY:-n8n8n8n}"
+
+# N8N 功能配置
+export N8N_RUNNERS_ENABLED=false
+export N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+export N8N_RUNNERS_ENABLED=true
