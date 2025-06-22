@@ -53,6 +53,30 @@ chmod +x "$HOME/agsb/sing-box"
 sbcore=$("$HOME/agsb/sing-box" version 2>/dev/null | awk '/version/{print $NF}')
 echo "已安装Sing-box正式版内核：$sbcore"
 fi
+
+# 下载订阅服务相关文件
+mkdir -p "$HOME/agsb/sub"
+curl -Ls "https://raw.githubusercontent.com/MyMaskKing/help_tools/refs/heads/main/vless/sub_server.py?token=GHSAT0AAAAAADCDRMSHP2EQWHQAEEPS34IW2CXVJXQ" -o "$HOME/agsb/sub_server.py"
+curl -Ls "https://raw.githubusercontent.com/MyMaskKing/help_tools/refs/heads/main/vless/manage_sub.sh?token=GHSAT0AAAAAADCDRMSHESYKUGUUQ6NEAEMK2CXVJLQ" -o "$HOME/agsb/manage_sub.sh"
+chmod +x "$HOME/agsb/manage_sub.sh"
+
+# 检查Python3和pip
+command -v python3 >/dev/null 2>&1 || { echo "需要Python3但未安装"; return 1; }
+command -v pip3 >/dev/null 2>&1 || { echo "需要pip3但未安装"; return 1; }
+
+# 安装Python依赖
+pip3 install flask gunicorn >/dev/null 2>&1
+
+# 生成token
+if [ ! -f "$HOME/agsb/sub/token" ]; then
+openssl rand -hex 16 > "$HOME/agsb/sub/token"
+fi
+
+# 启动订阅服务器
+pkill -f "sub_server.py"
+nohup python3 "$HOME/agsb/sub_server.py" > "$HOME/agsb/sub.log" 2>&1 &
+echo $! > "$HOME/agsb/sub.pid"
+
 cat > "$HOME/agsb/sb.json" <<EOF
 {
 "log": {
