@@ -474,115 +474,157 @@ showmode
 echo "---------------------------------------------------------"
 echo
 
-# 订阅相关函数
-gen_subscription() {
-    local sub_file="$HOME/agsb/sub.txt"
-    local sub_dir="$HOME/agsb/sub"
-    local jh_file="$HOME/agsb/jh.txt"
+# 订阅服务器相关函数
+setup_sub_server() {
+    # 检查Python3和pip
+    command -v python3 >/dev/null 2>&1 || { echo "需要Python3但未安装"; return 1; }
+    command -v pip3 >/dev/null 2>&1 || { echo "需要pip3但未安装"; return 1; }
     
-    # 确保目录存在
-    mkdir -p "$sub_dir"
+    # 创建订阅服务器文件
+    cat > "$HOME/agsb/sub_server.py" <<'EOF'
+from flask import Flask, jsonify
+import os
+import base64
+from datetime import datetime
+
+app = Flask(__name__)
+
+HOME = os.path.expanduser("~")
+SUB_DIR = os.path.join(HOME, "agsb/sub")
+SUB_FILE = os.path.join(HOME, "agsb/jh.txt")
+TOKEN_FILE = os.path.join(SUB_DIR, "token")
+
+def read_token():
+    try:
+        with open(TOKEN_FILE, 'r') as f:
+            return f.read().strip()
+    except:
+        return None
+
+def read_sub_content():
+    try:
+        with open(SUB_FILE, 'r') as f:
+            content = f.read()
+            return base64.b64encode(content.encode()).decode()
+    except:
+        return ""
+
+@app.route('/sub/<token>')
+def get_subscription(token):
+    valid_token = read_token()
+    if not valid_token or token != valid_token:
+        return jsonify({"error": "无效的订阅token"}), 403
     
-    # 如果节点文件存在，进行base64编码
-    if [ -f "$jh_file" ]; then
-        base64 "$jh_file" | tr -d '\n' > "$sub_file"
-        echo "订阅文件已生成：$sub_file"
+    content = read_sub_content()
+    if not content:
+        return jsonify({"error": "订阅内容为空"}), 404
+    
+    return content, 200, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Subscription-Userinfo': 'upload=0; download=0; total=0; expire=0'
+    }
+
+@app.route('/sub/status')
+def get_server_status():
+    return jsonify({
+        "status": "running",
+        "time": datetime.now().isoformat()
+    })
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)
+EOF
+
+    # 安装依赖
+    pip3 install flask gunicorn >/dev/null 2>&1
+    
+    # 生成token
+    mkdir -p "$HOME/agsb/sub"
+    if [ ! -f "$HOME/agsb/sub/token" ]; then
+        openssl rand -hex 16 > "$HOME/agsb/sub/token"
+    fi
+    
+    # 启动服务器
+    pkill -f "sub_server.py"
+    nohup python3 "$HOME/agsb/sub_server.py" > "$HOME/agsb/sub.log" 2>&1 &
+    echo $! > "$HOME/agsb/sub.pid"
+    
+    # 等待服务器启动
+    sleep 2
+    if curl -s http://localhost:8080/sub/status >/dev/null; then
+        echo "订阅服务器启动成功"
     else
-        echo "节点文件不存在，请先生成节点配置"
+        echo "订阅服务器启动失败"
         return 1
     fi
 }
 
-# 生成订阅链接
+# 获取订阅链接
 get_sub_url() {
     local domain=$1
-    local sub_dir="$HOME/agsb/sub"
-    local token_file="$sub_dir/token"
+    local token
+    token=$(cat "$HOME/agsb/sub/token" 2>/dev/null)
     
-    # 生成token（如果不存在）
-    if [ ! -f "$token_file" ]; then
-        openssl rand -hex 16 > "$token_file"
+    if [ -z "$domain" ]; then
+        echo "请提供域名"
+        return 1
     fi
     
-    local token=$(cat "$token_file")
-    echo "https://$domain/sub/$token"
-}
-
-# 更新订阅
-update_subscription() {
-    gen_subscription
-    echo "订阅内容已更新"
-}
-
-# 在main函数中添加订阅相关命令处理
-main() {
-    local action=$1
-    shift
+    if [ -z "$token" ]; then
+        echo "未找到token，请先运行setup_sub_server"
+        return 1
+    fi
     
-    case "$action" in
-        "sub")
-            case "$1" in
-                "gen")
-                    gen_subscription
-                    ;;
-                "url")
-                    if [ -z "$2" ]; then
-                        echo "请提供域名: agsb sub url <domain>"
-                        return 1
-                    fi
-                    get_sub_url "$2"
-                    ;;
-                "update")
-                    update_subscription
-                    ;;
-                *)
-                    echo "用法: agsb sub {gen|url|update} [domain]"
-                    ;;
-            esac
-            ;;
-        # ... existing code ...
-    esac
+    echo "订阅链接: https://$domain/sub/$token"
 }
 
-# 在cip函数中添加自动更新订阅的功能
-cip(){
-    # ... existing code ...
-    
-    # 在生成节点信息后自动更新订阅
-    gen_subscription >/dev/null 2>&1
-}
-
+# 修改del函数，在卸载时同时停止订阅服务器
 if [ "$1" = "del" ]; then
-for P in /proc/[0-9]*; do if [ -L "$P/exe" ]; then TARGET=$(readlink -f "$P/exe" 2>/dev/null); if echo "$TARGET" | grep -qE '/agsb/c|/agsb/s'; then PID=$(basename "$P"); kill "$PID" 2>/dev/null && echo "Killed $PID ($TARGET)" || echo "Could not kill $PID ($TARGET)"; fi; fi; done
-kill -15 $(pgrep -f 'agsb/s' 2>/dev/null) $(pgrep -f 'agsb/c' 2>/dev/null) >/dev/null 2>&1
-sed -i '/yonggekkk/d' ~/.bashrc
-sed -i '/export PATH="\$HOME\/bin:\$PATH"/d' ~/.bashrc
-. ~/.bashrc
-crontab -l > /tmp/crontab.tmp 2>/dev/null
-sed -i '/agsb\/sing-box/d' /tmp/crontab.tmp
-sed -i '/agsb\/cloudflared/d' /tmp/crontab.tmp
-crontab /tmp/crontab.tmp 2>/dev/null
-rm /tmp/crontab.tmp
-rm -rf "$HOME/agsb" "$HOME/bin/agsb"
+    for P in /proc/[0-9]*; do if [ -L "$P/exe" ]; then TARGET=$(readlink -f "$P/exe" 2>/dev/null); if echo "$TARGET" | grep -qE '/agsb/c|/agsb/s'; then PID=$(basename "$P"); kill "$PID" 2>/dev/null && echo "Killed $PID ($TARGET)" || echo "Could not kill $PID ($TARGET)"; fi; fi; done
+    kill -15 $(pgrep -f 'agsb/s' 2>/dev/null) $(pgrep -f 'agsb/c' 2>/dev/null) >/dev/null 2>&1
+    sed -i '/yonggekkk/d' ~/.bashrc
+    sed -i '/export PATH="\$HOME\/bin:\$PATH"/d' ~/.bashrc
+    . ~/.bashrc
+    crontab -l > /tmp/crontab.tmp 2>/dev/null
+    sed -i '/agsb\/sing-box/d' /tmp/crontab.tmp
+    sed -i '/agsb\/cloudflared/d' /tmp/crontab.tmp
+    crontab /tmp/crontab.tmp 2>/dev/null
+    rm /tmp/crontab.tmp
+    rm -rf "$HOME/agsb" "$HOME/bin/agsb"
 
-kill -15 $(cat /etc/s-box-ag/sbargopid.log 2>/dev/null) >/dev/null 2>&1
-kill -15 $(cat /etc/s-box-ag/sbpid.log 2>/dev/null) >/dev/null 2>&1
-kill -15 $(cat nixag/sbargopid.log 2>/dev/null) >/dev/null 2>&1
-kill -15 $(cat nixag/sbpid.log 2>/dev/null) >/dev/null 2>&1
-crontab -l > /tmp/crontab.tmp 2>/dev/null
-sed -i '/sbargopid/d' /tmp/crontab.tmp
-sed -i '/sbpid/d' /tmp/crontab.tmp
-crontab /tmp/crontab.tmp 2>/dev/null
-rm /tmp/crontab.tmp
-rm -rf /etc/s-box-ag /usr/bin/agsb
-sed -i '/yonggekkk/d' ~/.bashrc
-. ~/.bashrc
-rm -rf nixag
-echo "卸载完成"
-exit
+    kill -15 $(cat /etc/s-box-ag/sbargopid.log 2>/dev/null) >/dev/null 2>&1
+    kill -15 $(cat /etc/s-box-ag/sbpid.log 2>/dev/null) >/dev/null 2>&1
+    kill -15 $(cat nixag/sbargopid.log 2>/dev/null) >/dev/null 2>&1
+    kill -15 $(cat nixag/sbpid.log 2>/dev/null) >/dev/null 2>&1
+    crontab -l > /tmp/crontab.tmp 2>/dev/null
+    sed -i '/sbargopid/d' /tmp/crontab.tmp
+    sed -i '/sbpid/d' /tmp/crontab.tmp
+    crontab /tmp/crontab.tmp 2>/dev/null
+    rm /tmp/crontab.tmp
+    rm -rf /etc/s-box-ag /usr/bin/agsb
+    sed -i '/yonggekkk/d' ~/.bashrc
+    . ~/.bashrc
+    rm -rf nixag
+    echo "卸载完成"
+    exit
 elif [ "$1" = "list" ]; then
-cip
-exit
+    cip
+    exit
+elif [ "$1" = "sub" ]; then
+    case "$2" in
+        "url")
+            if [ -z "$3" ]; then
+                echo "用法: agsb sub url <domain>"
+                exit 1
+            fi
+            get_sub_url "$3"
+            ;;
+        *)
+            echo "用法: agsb sub url <domain>"
+            exit 1
+            ;;
+    esac
+    exit
 fi
 
 if ! find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -q 'agsb/s' && ! pgrep -f 'agsb/s' >/dev/null 2>&1; then
