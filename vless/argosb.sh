@@ -326,6 +326,20 @@ fi
 crontab /tmp/crontab.tmp 2>/dev/null
 rm /tmp/crontab.tmp
 echo "ArgoSB脚本进程启动成功，安装完毕" && sleep 2
+
+# 保活函数
+keep_alive() {
+    while true; do
+        # 每10分钟执行一次无害的命令
+        sleep 600
+        date > /dev/null 2>&1
+    done
+}
+
+# 启动保活进程
+nohup sh -c "$(declare -f keep_alive); keep_alive" > /dev/null 2>&1 &
+echo $! > "$HOME/agsb/keepalive.pid"
+
 else
 echo "ArgoSB脚本进程未启动，安装失败" && exit
 fi
@@ -580,6 +594,12 @@ get_sub_url() {
 
 # 修改del函数，在卸载时同时停止订阅服务器
 if [ "$1" = "del" ]; then
+    # 停止保活进程
+    if [ -f "$HOME/agsb/keepalive.pid" ]; then
+        kill -9 $(cat "$HOME/agsb/keepalive.pid") >/dev/null 2>&1
+        rm -f "$HOME/agsb/keepalive.pid"
+    fi
+    
     for P in /proc/[0-9]*; do if [ -L "$P/exe" ]; then TARGET=$(readlink -f "$P/exe" 2>/dev/null); if echo "$TARGET" | grep -qE '/agsb/c|/agsb/s'; then PID=$(basename "$P"); kill "$PID" 2>/dev/null && echo "Killed $PID ($TARGET)" || echo "Could not kill $PID ($TARGET)"; fi; fi; done
     kill -15 $(pgrep -f 'agsb/s' 2>/dev/null) $(pgrep -f 'agsb/c' 2>/dev/null) >/dev/null 2>&1
     sed -i '/yonggekkk/d' ~/.bashrc
