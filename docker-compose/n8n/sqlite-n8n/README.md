@@ -39,6 +39,20 @@ sudo chmod -R 775 ./data
 
 > `1000:1000` 是容器内 `node` 用户的默认 UID 和 GID。如果您使用的是其他 UID 或 GID，请根据实际情况修改。
 
+### a.汉化
+1. 下载n8n对应tag的汉化资源
+https://github.com/other-blowsnow/n8n-i18n-chinese.git
+```bash
+可以从n8n网站左下角看到版本
+```
+2. 在docker-compose中加入下面
+``` yml
+    environment:
+      - N8N_DEFAULT_LOCALE=zh-CN
+    volumes:
+      - ./editor-ui-dist:/usr/local/lib/node_modules/n8n/node_modules/n8n-editor-ui/dist
+```
+
 #### 4. 启动 n8n 服务
 
 在 `n8n-compose.yml` 文件所在目录运行以下命令来启动 n8n 服务：
@@ -107,6 +121,8 @@ TZ=Asia/Shanghai
 environment:
   - N8N_SECURE_COOKIE=false
 ```
+
+#### 汉化
 
 ---
 
