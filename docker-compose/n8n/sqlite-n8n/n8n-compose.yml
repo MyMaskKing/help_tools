@@ -2,14 +2,14 @@ version: '3.8'
 
 services:
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:1.101.1
     container_name: n8n
     restart: unless-stopped
     ports:
       - "5678:5678"
     environment:
       - N8N_DEFAULT_LOCALE=zh-CN
-      # - N8N_RUNNERS_ENABLED=true
+      - N8N_RUNNERS_ENABLED=true
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
       - DB_TYPE=sqlite
       - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
