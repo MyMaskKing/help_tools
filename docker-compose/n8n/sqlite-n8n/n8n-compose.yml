@@ -9,7 +9,7 @@ services:
       - "5678:5678"
     environment:
       - N8N_DEFAULT_LOCALE=zh-CN
-      - N8N_RUNNERS_ENABLED=true
+      # - N8N_RUNNERS_ENABLED=true # 启用多进程，单机版不要开启，否则会报403 Runner错误
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
       - DB_TYPE=sqlite
       - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
@@ -29,6 +29,7 @@ services:
       - N8N_LOG_LEVEL=debug
       - N8N_LOG_OUTPUT=console
       - N8N_LOG_FORMAT=plain
+      - N8N_DIAGNOSTICS_ENABLED=false # 禁止收集和发送任何遥测数据。
     volumes:
       - ./data:/home/node/.n8n
       - ./editor-ui-dist:/usr/local/lib/node_modules/n8n/node_modules/n8n-editor-ui/dist
