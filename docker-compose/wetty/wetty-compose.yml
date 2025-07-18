@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  wetty:
+    image: wettyoss/wetty
+    container_name: wetty
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      BASE: "/"
+    command: >
+      --port 3000
+      --ssh-host 127.0.0.1
+      --ssh-user cyj
+      --force-ssh
+      --title "MiniPC Terminal"
