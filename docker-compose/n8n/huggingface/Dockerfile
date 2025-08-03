@@ -13,11 +13,16 @@ ARG N8N_PUBLIC_URL=n8n.10023456.xyz
 ARG POSTGRESDB_PORT=5432
 
 # 设置基本环境变量
+# 注意：
+#     1.N8N_PUBLIC_URL的设置在本文件中没有生效，需要在n8n/config/n8n_env.sh设置才可以
+#     2.微软TODO的密钥期限是两年
 ENV WEBHOOK_URL=https://${N8N_PUBLIC_URL}/ \
+    N8N_WEBHOOK_URL=https://${N8N_PUBLIC_URL}/ \
     N8N_HOST=${N8N_PUBLIC_URL} \
     N8N_PORT=7860 \
     N8N_PROTOCOL=https \
     N8N_PUSH_BACKEND=websocket \
+    N8N_TRUST_PROXY=true \
     VUE_APP_URL_BASE_WEBSOCKET=wss://${N8N_PUBLIC_URL} \
     N8N_DEFAULT_LOCALE=zh-CN \
     GENERIC_TIMEZONE=Asia/Shanghai \
