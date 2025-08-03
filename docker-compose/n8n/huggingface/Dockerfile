@@ -1,3 +1,4 @@
+# syntax = docker/dockerfile:1.4
 # 使用 PostgreSQL 作为基础镜像
 FROM nikolaik/python-nodejs:python3.12-nodejs20
 
@@ -5,16 +6,20 @@ FROM nikolaik/python-nodejs:python3.12-nodejs20
 LABEL maintainer="ai来事 <https://www.youtube.com/@all.ai.>"
 
 ARG CACHEBUST=222
+ARG N8N_VERSION=1.104.2
 
 # 设置构建参数，提供默认值
-ARG WEBHOOK_URL=https://你的hf账户名-空间名.hf.space/
+ARG N8N_PUBLIC_URL=n8n.10023456.xyz
 ARG POSTGRESDB_PORT=5432
 
 # 设置基本环境变量
-ENV WEBHOOK_URL=${WEBHOOK_URL} \
-    N8N_HOST=0.0.0.0 \
+ENV WEBHOOK_URL=https://${N8N_PUBLIC_URL}/ \
+    N8N_HOST=${N8N_PUBLIC_URL} \
     N8N_PORT=7860 \
     N8N_PROTOCOL=https \
+    N8N_PUSH_BACKEND=websocket \
+    VUE_APP_URL_BASE_WEBSOCKET=wss://${N8N_PUBLIC_URL} \
+    N8N_DEFAULT_LOCALE=zh-CN \
     GENERIC_TIMEZONE=Asia/Shanghai \
     N8N_METRICS=true \
     QUEUE_HEALTH_CHECK_ACTIVE=true \
@@ -72,11 +77,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     # 创建虚拟环境并安装 Python 依赖
     && python3 -m venv $VIRTUAL_ENV \
-    && $VIRTUAL_ENV/bin/pip install --no-cache-dir --upgrade pip requests yt-dlp \
-    # 安装 n8n
-    && npm install -g n8n@latest pnpm \
-    && npm list -g n8n \
-    && npm cache clean --force
+    && $VIRTUAL_ENV/bin/pip install --no-cache-dir --upgrade pip requests yt-dlp 
+
+###############################
+# 安装指定版本 n8n + 中文汉化覆盖 ✔️
+###############################
+RUN npm install -g n8n@${N8N_VERSION} pnpm && \
+    git clone --depth 1 https://github.com/other-blowsnow/n8n-i18n-chinese.git /tmp/n8n-zh && \
+    cd /tmp/n8n-zh && \
+    git fetch --tags && \
+    git checkout n8n@${N8N_VERSION} && \
+    ls -l && \
+    cp -a editor-ui-dist/* $(npm root -g)/n8n/node_modules/n8n-editor-ui/dist/ && \
+    cd / && \
+    rm -rf /tmp/n8n-zh && \
+    npm cache clean --force
+
 
 # 创建健康检查脚本
 COPY --chown=pn:pn healthcheck.sh /home/pn/n8n/healthcheck.sh
