@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   n8n:
-    image: n8nio/n8n:1.101.1
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: n8n
     restart: unless-stopped
     ports:
@@ -46,7 +48,8 @@ services:
       - NO_PROXY=localhost,127.0.0.1
     volumes:
       - ./data:/home/node/.n8n
-      - ./editor-ui-dist:/usr/local/lib/node_modules/n8n/node_modules/n8n-editor-ui/dist
+      # 自动汉化的不需要映射，在Dockerfile中已经映射了
+      # - ./editor-ui-dist:/usr/local/lib/node_modules/n8n/node_modules/n8n-editor-ui/dist
     # 注意：限制内存是在3+版本中使用的，2.x版本中使用的是N8N_MAX_OLD_SPACE_SIZE
     # deploy:
     #   resources:
