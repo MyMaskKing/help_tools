@@ -8,11 +8,17 @@ services:
       - NAPCAT_UID=${NAPCAT_UID}
       - NAPCAT_GID=${NAPCAT_GID}
     ports:
-      - "3009:3000"   # WebUI
-      - "3010:3001"   # WebSocket
-      - "6099:6099"   # WebUI（可选）
+      - "3009:3000"   #  HTTP接口
+      - "3010:3001"   # WebSocket（如果你用）
+      - "6099:6099"   # WebUI
     volumes:
       - ./data/QQ:/app/.config/QQ
       - ./data/napcat/config:/app/napcat/config
     restart: always
     network_mode: bridge
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/get_status -H \"Authorization: Bearer cyj123456\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
