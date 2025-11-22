@@ -4,24 +4,37 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
-    restart: unless-stopped
-    network_mode: host  # ✅ 允许访问宿主机上的服务
+    restart: always  # 容器失败时自动重启
+    network_mode: host  # 允许容器访问宿主机网络
     environment:
-      # ✅ 设置容器内 HTTP/HTTPS 请求都走宿主机代理（FlClash 默认 SOCKS5 为 7890，HTTP 为 7890）
-      - HTTP_PROXY=http://127.0.0.1:7890
-      - HTTPS_PROXY=http://127.0.0.1:7890
-      - NO_PROXY=localhost,127.0.0.1
+      - HTTP_PROXY=http://127.0.0.1:7890  # 设置 HTTP 代理
+      - HTTPS_PROXY=http://127.0.0.1:7890  # 设置 HTTPS 代理
+      - NO_PROXY=localhost,127.0.0.1  # 不使用代理的地址
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-    command: >
-      tunnel --no-autoupdate run
-      --token eyJhIjoiZDIwODZkMjEzMzJiNDY3ZGRhZjhkM2UwMWZiNTJjZDUiLCJ0IjoiMGQwZTYwYzUtZWUyMi00YjE4LWExYjgtYTY4NDg1YmRlNDUzIiwicyI6Ik1tVTBPV1kwWkRndE56azVNUzAwT0RBNUxUa3lOMk10T1dWaE5EVmhORFV5TTJNMCJ9
+      - ./logs:/var/log/cloudflared  # 将日志目录持久化到宿主机
+    command: 
+      [
+        "--loglevel", "info", 
+        "--logfile", "/var/log/cloudflared/cloudflared.log",
+        "--metrics", "localhost:2000",
+        "tunnel", 
+        "--no-autoupdate",
+        "run",
+        "--token", "eyJhIjoiZDIwODZkMjEzMzJiNDY3ZGRhZjhkM2UwMWZiNTJjZDUiLCJ0IjoiMGQwZTYwYzUtZWUyMi00YjE4LWExYjgtYTY4NDg1YmRlNDUzIiwicyI6Ik1tVTBPV1kwWkRndE56azVNUzAwT0RBNUxUa3lOMk10T1dWaE5EVmhORFV5TTJNMCJ9"
+      ]
 
     # 健康检查配置
     healthcheck:
-      test: ["CMD", "sh", "-c", "docker logs cloudflared | grep -q 'no free edge addresses' || docker logs cloudflared | grep -q 'failed to dial'"]
+      test: ["CMD-SHELL", "curl -f http://localhost:2000/ready || curl -f http://localhost:2000/metrics"]
       interval: 30s  # 每30秒检查一次
       retries: 3  # 如果失败3次，Docker 会重启容器
-      start_period: 10s  # 容器启动后，健康检查将会在10秒后开始
+      start_period: 10s  # 容器启动后，健康检查将在10秒后开始
       timeout: 5s  # 每次检查的超时时间
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
