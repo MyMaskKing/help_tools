@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    network_mode: host  # ✅ 允许访问宿主机上的服务
+    environment:
+      # ✅ 设置容器内 HTTP/HTTPS 请求都走宿主机代理（FlClash 默认 SOCKS5 为 7890，HTTP 为 7890）
+      - HTTP_PROXY=http://127.0.0.1:7890
+      - HTTPS_PROXY=http://127.0.0.1:7890
+      - NO_PROXY=localhost,127.0.0.1
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    command: >
+      tunnel --no-autoupdate run
+      --token eyJhIjoiZDIwODZkMjEzMzJiNDY3ZGRhZjhkM2UwMWZiNTJjZDUiLCJ0IjoiMGQwZTYwYzUtZWUyMi00YjE4LWExYjgtYTY4NDg1YmRlNDUzIiwicyI6Ik1tVTBPV1kwWkRndE56azVNUzAwT0RBNUxUa3lOMk10T1dWaE5EVmhORFV5TTJNMCJ9
