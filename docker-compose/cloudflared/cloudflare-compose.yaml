@@ -17,3 +17,11 @@ services:
     command: >
       tunnel --no-autoupdate run
       --token eyJhIjoiZDIwODZkMjEzMzJiNDY3ZGRhZjhkM2UwMWZiNTJjZDUiLCJ0IjoiMGQwZTYwYzUtZWUyMi00YjE4LWExYjgtYTY4NDg1YmRlNDUzIiwicyI6Ik1tVTBPV1kwWkRndE56azVNUzAwT0RBNUxUa3lOMk10T1dWaE5EVmhORFV5TTJNMCJ9
+
+    # 健康检查配置
+    healthcheck:
+      test: ["CMD", "sh", "-c", "docker logs cloudflared | grep -q 'no free edge addresses' || docker logs cloudflared | grep -q 'failed to dial'"]
+      interval: 30s  # 每30秒检查一次
+      retries: 3  # 如果失败3次，Docker 会重启容器
+      start_period: 10s  # 容器启动后，健康检查将会在10秒后开始
+      timeout: 5s  # 每次检查的超时时间
