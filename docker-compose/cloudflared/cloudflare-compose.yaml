@@ -27,7 +27,7 @@ services:
 
     # 健康检查配置
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:2000/ready || curl -f http://localhost:2000/metrics"]
+      test: ["CMD-SHELL", "curl -s http://localhost:2000/metrics | grep -E '^cloudflared_tunnel_ha_connections [1-9]'"]
       interval: 30s  # 每30秒检查一次
       retries: 3  # 如果失败3次，Docker 会重启容器
       start_period: 10s  # 容器启动后，健康检查将在10秒后开始
