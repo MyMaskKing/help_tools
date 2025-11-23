@@ -21,8 +21,9 @@ send_webhook() {
     curl -X POST "$WEBHOOK_URL" \
          -H "Authorization: xxx" \
          -H "Content-Type: application/json" \
-         -d "${payload}" >/dev/null 2>&1
-    echo "WEBHOOK SEND OVER: $message"
+                  -d "${payload}" >/dev/null 2>&1
+
+    echo "WEBHOOK 发送通知: $message"
 }
 
 restart_container() {
@@ -63,15 +64,17 @@ for cname in "${MONITORED_CONTAINERS[@]}"; do
     # 默认先用 docker inspect 来判断 health.status（如果定义有 HEALTHCHECK）
     health_status=$(docker inspect --format='{{.State.Health.Status}}' "$cname" 2>/dev/null)
 
-    if [ "$cname" == "cloudflared" ]; then
+    if [[ "$cname" == *cloudflared* ]]; then
         # 针对 cloudflared 做特殊检测（readiness endpoint）
         http_response=$(curl -s ${CLOUDFLARED_READY_URL} \
                      | grep -E '^cloudflared_tunnel_ha_connections [1-9]')
         if [ -z "$http_response" ]; then
             http_response="unhealthy"
+        else
+            http_response="healthy"
         fi
-        echo "$(date): $cname readiness HTTP Response: $http_response"
     fi
+    echo "$(date): $cname readiness HTTP Response: $http_response"
 
     # 根据 health_status 决定是否重启
     if [ "$health_status" != "healthy" ]; then
