@@ -21,7 +21,7 @@ send_webhook() {
     curl -X POST "$WEBHOOK_URL" \
          -H "Authorization: xxx" \
          -H "Content-Type: application/json" \
-                  -d "${payload}" >/dev/null 2>&1
+         -d "${payload}" >/dev/null 2>&1
 
     echo "WEBHOOK 发送通知: $message"
 }
