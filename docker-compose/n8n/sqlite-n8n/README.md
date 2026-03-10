@@ -151,6 +151,11 @@ environment:
   ```bash
   docker-compose down --volumes
   ```
+* **强制重新部署**：
+
+  ```bash
+  docker compose -f n8n-compose.yaml up --force-recreate --build -d
+  ```
 
 ---
 
