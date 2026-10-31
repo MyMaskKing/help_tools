@@ -13,7 +13,9 @@ services:
       - "6099:6099"   # WebUI
     volumes:
       - ./data/QQ:/app/.config/QQ
+      - ./data/QQ:/napcat-qq-data:ro
       - ./data/napcat/config:/app/napcat/config
+      - ./logs:/app/logs
     restart: always
     network_mode: bridge
     healthcheck:

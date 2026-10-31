@@ -1,0 +1,29 @@
+services:
+  qwen-qq-bot:
+    build: .
+    container_name: qwen-qq-bot
+    network_mode: host
+    environment:
+      - WS_URL=ws://127.0.0.1:3010
+      - WS_TOKEN=cyj123456
+      - OLLAMA_URL=http://127.0.0.1:11434
+      - OLLAMA_MODEL=qwen25-1.5b:latest
+      - NAPCAT_PATH_PREFIX=/app/.config/QQ
+      - NAPCAT_DATA_DIR=/napcat-qq-data
+      - AUDIO_PUBLIC_BASE=http://172.17.0.1:8123
+      - AUDIO_HTTP_PORT=8123
+      - WHISPER_MODEL=tiny
+      - WHISPER_DEVICE=cpu
+      - WHISPER_COMPUTE=int8
+      # Edge-TTS 软糯儿童女声：晓双
+      - TTS_VOICE=zh-CN-XiaoshuangNeural
+      - TTS_RATE=-5%
+      - TTS_PITCH=+2Hz
+      - TTS_VOLUME=+0%
+      - TZ_NAME=Asia/Shanghai
+    volumes:
+      - ./data:/app/data
+      - /root/docker-compose/QQ/data/QQ:/napcat-qq-data:ro
+      - ./audio:/app/audio
+      - ./models:/app/models
+    restart: unless-stopped

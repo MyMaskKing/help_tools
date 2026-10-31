@@ -1,0 +1,30 @@
+services:
+
+  npc:
+    image: duan2001/npc:v0.34.7
+
+    container_name: npc
+
+    restart: always
+
+    network_mode: host
+
+    volumes:
+      - ./conf:/conf
+      - /etc/localtime:/etc/localtime:ro
+
+    command:
+      - "-config=/conf/npc.conf"
+      - "-log=on"
+
+    environment:
+      TZ: Asia/Shanghai
+
+    mem_limit: 128m
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
