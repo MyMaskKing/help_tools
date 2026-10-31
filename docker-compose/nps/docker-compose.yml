@@ -4,6 +4,9 @@ services:
     container_name: nps
     restart: unless-stopped
 
+    # host 网络：直接用宿主机网络栈，省掉一层 NAT，吞吐和延迟都更好。
+    # 注意：必须在 Linux 宿主机上跑；Windows/macOS 的 Docker Desktop 上 host 模式行为不同，
+    # 9000/9100 不一定按预期对外暴露。
     network_mode: host
 
     volumes:
@@ -13,7 +16,14 @@ services:
     environment:
       TZ: Asia/Shanghai
 
-    mem_limit: 256m
+    # 256m 在大流量/多连接时会被 OOMKilled 然后重启，表现就是"整体卡死一阵又恢复"
+    mem_limit: 512m
+
+    # 默认 nofile=1024，连接数上来后会 "too many open files" 导致连接排队
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
 
     logging:
       driver: json-file

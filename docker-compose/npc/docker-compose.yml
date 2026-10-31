@@ -20,7 +20,12 @@ services:
     environment:
       TZ: Asia/Shanghai
 
-    mem_limit: 128m
+    mem_limit: 256m
+
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
 
     logging:
       driver: json-file
