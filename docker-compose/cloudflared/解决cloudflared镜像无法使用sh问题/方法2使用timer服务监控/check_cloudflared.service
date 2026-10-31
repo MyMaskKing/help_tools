@@ -1,0 +1,9 @@
+[Unit]
+Description=Cloudflare Tunnel Health Check
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/check_cloudflared.sh
+# 输出全部重定向到日志文件
+StandardOutput=append:/var/log/check_cloudflared.log
+StandardError=append:/var/log/check_cloudflared.log

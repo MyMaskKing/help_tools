@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Cloudflare Tunnel Health Check every 5 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+Unit=check_cloudflared.service
+
+[Install]
+WantedBy=timers.target
