@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QQ AI 机器人 · 管理后台</title>
+<style>
+  :root {
+    --bg: #f3f5fa;
+    --card: #ffffff;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --ok: #16a34a;
+    --bad: #dc2626;
+    --warn: #b45309;
+    --shadow: 0 10px 30px rgba(15, 23, 42, .08);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  h1, h2 { margin: 0; font-weight: 650; letter-spacing: .01em; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 17px; margin-bottom: 4px; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12.5px; }
+  .error { color: var(--bad); }
+  .warning { color: var(--warn); }
+
+  .login-wrap {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 380px;
+    padding: 32px;
+  }
+  .login-card h1 { margin-bottom: 6px; }
+  .login-card .muted { margin-bottom: 22px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+  .topbar {
+    background: #111827;
+    color: #fff;
+    padding: 14px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .brand { font-size: 16px; font-weight: 650; }
+  .brand span { color: #9ca3af; font-weight: 400; margin-left: 6px; }
+  .top-actions { display: flex; align-items: center; gap: 10px; }
+
+  .container {
+    max-width: 1000px;
+    margin: 24px auto 64px;
+    padding: 0 18px;
+  }
+  .tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .tab {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--muted);
+    padding: 8px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .tab.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+  }
+  .panel { padding: 24px; }
+  .panel h2 + p { margin-bottom: 18px; }
+
+  label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .hint {
+    display: block;
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 12.5px;
+    margin-top: -1px;
+    margin-bottom: 4px;
+  }
+  input, textarea {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 9px;
+    padding: 10px 12px;
+    font: inherit;
+    color: var(--text);
+    background: #fff;
+    outline: none;
+  }
+  input:focus, textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
+  }
+  textarea {
+    resize: vertical;
+    min-height: 220px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 18px;
+  }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  button {
+    border: 0;
+    border-radius: 9px;
+    padding: 10px 16px;
+    font: inherit;
+    cursor: pointer;
+    transition: background .15s ease, opacity .15s ease;
+  }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  .primary { background: var(--primary); color: #fff; }
+  .primary:hover:not(:disabled) { background: var(--primary-dark); }
+  .ghost {
+    background: #fff;
+    color: var(--text);
+    border: 1px solid #d1d5db;
+  }
+  .ghost:hover:not(:disabled) { background: #f9fafb; }
+  .danger { background: #fee2e2; color: var(--bad); }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 600;
+    background: #374151;
+    color: #d1d5db;
+  }
+  .pill::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #9ca3af;
+  }
+  .pill.ok { background: rgba(22, 163, 74, .18); color: #86efac; }
+  .pill.ok::before { background: #4ade80; }
+  .pill.bad { background: rgba(220, 38, 38, .18); color: #fca5a5; }
+  .pill.bad::before { background: #f87171; }
+
+  .status-meta {
+    color: #9ca3af;
+    font-size: 12.5px;
+    text-align: right;
+    width: 100%;
+  }
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 26px;
+    transform: translateX(-50%) translateY(10px);
+    background: #111827;
+    color: #fff;
+    padding: 11px 18px;
+    border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .25);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease;
+    max-width: min(90vw, 560px);
+    z-index: 20;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: #991b1b; }
+  .divider { height: 1px; background: var(--line); margin: 18px 0; }
+
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr; }
+    .panel { padding: 18px; }
+    .topbar { padding: 12px 16px; }
+    .status-meta { text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<div id="login" class="login-wrap">
+  <form id="login-form" class="card login-card" autocomplete="off">
+    <h1>QQ AI 机器人</h1>
+    <p class="muted">请输入管理密码。首次部署的密码会打印在容器启动日志里。</p>
+    <label>管理密码
+      <input id="login-password" type="password" autocomplete="current-password" required autofocus>
+    </label>
+    <button class="primary" type="submit" style="width:100%">登录</button>
+    <p id="login-error" class="error small" style="margin-top:12px" hidden></p>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="brand">QQ AI 机器人<span>管理后台</span></div>
+    <div class="top-actions">
+      <span id="ws-pill" class="pill">未连接</span>
+      <button id="logout" class="ghost" type="button">退出</button>
+    </div>
+    <div id="status-meta" class="status-meta">加载中…</div>
+  </header>
+
+  <main class="container">
+    <nav class="tabs">
+      <button class="tab active" type="button" data-tab="qq">QQ 连接</button>
+      <button class="tab" type="button" data-tab="ai">AI 设置</button>
+      <button class="tab" type="button" data-tab="tts">语音</button>
+      <button class="tab" type="button" data-tab="security">安全</button>
+    </nav>
+
+    <section id="panel-qq" class="card panel">
+      <h2>QQ 连接</h2>
+      <p class="muted">对应 NapCat 里的 OneBot WebSocket 服务器。保存后会立即断开当前连接并用新配置重连。</p>
+      <label>WebSocket 地址
+        <span class="hint">例如 ws://127.0.0.1:3010，必须是 ws:// 或 wss:// 开头</span>
+        <input id="ws_url" spellcheck="false">
+      </label>
+      <label>Token
+        <span class="hint">要和 NapCat「网络配置」里的 Token 完全一致</span>
+        <div class="row">
+          <input id="ws_token" type="password" autocomplete="off" spellcheck="false">
+          <button id="toggle-token" class="ghost" type="button">显示</button>
+        </div>
+      </label>
+      <div class="actions">
+        <button id="save-qq" class="primary" type="button">保存并重连</button>
+        <button id="reset-qq" class="ghost" type="button">恢复默认</button>
+      </div>
+    </section>
+
+    <section id="panel-ai" class="card panel" hidden>
+      <h2>AI 设置</h2>
+      <p class="muted">保存后下一条消息生效，不需要重启容器。</p>
+      <div class="grid">
+        <label>Ollama 地址
+          <span class="hint">例如 http://127.0.0.1:11434</span>
+          <input id="ollama_url" spellcheck="false">
+        </label>
+        <label>模型名
+          <span class="hint">必须和 <code>ollama list</code> 里的名字完全一致</span>
+          <input id="ollama_model" spellcheck="false">
+        </label>
+        <label>温度
+          <span class="hint">0～2，越高回答越发散</span>
+          <input id="temperature" type="number" min="0" max="2" step="0.01">
+        </label>
+        <label>回复长度
+          <span class="hint">16～2048，单位 token</span>
+          <input id="num_predict" type="number" min="16" max="2048" step="1">
+        </label>
+      </div>
+      <label>人设提示词（System Prompt）
+        <span class="hint">决定机器人的身份、语气和边界。改坏了可以点“恢复默认”。</span>
+        <textarea id="system_prompt" spellcheck="false"></textarea>
+      </label>
+      <div class="actions">
+        <button id="save-ai" class="primary" type="button">保存 AI 设置</button>
+        <button id="test-ollama" class="ghost" type="button">测试 Ollama 连接</button>
+        <button id="reset-ai" class="ghost" type="button">恢复默认</button>
+      </div>
+      <p id="ollama-result" class="muted small" style="margin-top:12px"></p>
+    </section>
+
+    <section id="panel-tts" class="card panel" hidden>
+      <h2>语音</h2>
+      <p class="muted">修改后下一条语音生效。Edge TTS 是免费接口，推荐使用中文音色。</p>
+      <div class="grid">
+        <label>音色
+          <span class="hint">点输入框右侧箭头选择，也可以直接输入任意 Edge TTS 音色名</span>
+          <input id="tts_voice" list="voice-options" spellcheck="false">
+          <datalist id="voice-options">
+            <!-- 普通话女声 -->
+            <option value="zh-CN-XiaoyiNeural" label="晓伊 · 活泼少女（推荐）"></option>
+            <option value="zh-CN-XiaoxiaoNeural" label="晓晓 · 温柔女声（推荐）"></option>
+            <option value="zh-CN-XiaochenNeural" label="晓辰 · 女声"></option>
+            <option value="zh-CN-XiaohanNeural" label="晓涵 · 女声"></option>
+            <option value="zh-CN-XiaomengNeural" label="晓梦 · 女声"></option>
+            <option value="zh-CN-XiaomoNeural" label="晓墨 · 女声"></option>
+            <option value="zh-CN-XiaoqiuNeural" label="晓秋 · 女声"></option>
+            <option value="zh-CN-XiaoruiNeural" label="晓睿 · 女声"></option>
+            <option value="zh-CN-XiaoxuanNeural" label="晓萱 · 女声"></option>
+            <option value="zh-CN-XiaoyanNeural" label="晓颜 · 女声"></option>
+            <option value="zh-CN-XiaozhenNeural" label="晓甄 · 女声"></option>
+            <!-- 普通话童声 -->
+            <option value="zh-CN-XiaoyouNeural" label="晓悠 · 童声"></option>
+            <option value="zh-CN-XiaoshuangNeural" label="晓双 · 童声（Azure 付费，Edge 不可用）"></option>
+            <!-- 普通话男声 -->
+            <option value="zh-CN-YunxiNeural" label="云希 · 阳光少年（推荐）"></option>
+            <option value="zh-CN-YunjianNeural" label="云健 · 男声"></option>
+            <option value="zh-CN-YunyangNeural" label="云扬 · 新闻男声"></option>
+            <option value="zh-CN-YunxiaNeural" label="云夏 · 男童"></option>
+            <option value="zh-CN-YunyeNeural" label="云野 · 男声"></option>
+            <option value="zh-CN-YunzeNeural" label="云泽 · 老年男声"></option>
+            <!-- 方言 -->
+            <option value="zh-CN-liaoning-XiaobeiNeural" label="晓北 · 东北话"></option>
+            <option value="zh-CN-shaanxi-XiaoniNeural" label="晓妮 · 陕西话"></option>
+            <!-- 粤语 / 台湾 -->
+            <option value="zh-HK-HiuGaaiNeural" label="曉佳 · 粤语女声"></option>
+            <option value="zh-HK-HiuMaanNeural" label="曉曼 · 粤语女声"></option>
+            <option value="zh-HK-WanLungNeural" label="雲龍 · 粤语男声"></option>
+            <option value="zh-TW-HsiaoChenNeural" label="曉臻 · 台湾女声"></option>
+            <option value="zh-TW-HsiaoYuNeural" label="曉雨 · 台湾女声"></option>
+            <option value="zh-TW-YunJheNeural" label="雲哲 · 台湾男声"></option>
+          </datalist>
+          <span id="voice-warning" class="warning small" hidden>
+            zh-CN-XiaoshuangNeural 是 Azure 付费音色，Edge TTS 免费接口里没有，会自动回退到备用音色。
+          </span>
+        </label>
+        <label>语速
+          <span class="hint">格式如 -5%</span>
+          <input id="tts_rate" spellcheck="false">
+        </label>
+        <label>音调
+          <span class="hint">格式如 +10Hz</span>
+          <input id="tts_pitch" spellcheck="false">
+        </label>
+        <label>音量
+          <span class="hint">格式如 +0%</span>
+          <input id="tts_volume" spellcheck="false">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="save-tts" class="primary" type="button">保存语音设置</button>
+        <button id="reset-tts" class="ghost" type="button">恢复默认</button>
+      </div>
+    </section>
+
+    <section id="panel-security" class="card panel" hidden>
+      <h2>安全</h2>
+      <p class="muted">后台只提供 HTTP，请尽量在局域网使用，或通过 SSH 隧道访问。</p>
+      <div id="password-fixed-note" class="warning small" style="margin:12px 0" hidden>
+        当前密码由 <code>ADMIN_PASSWORD</code> 环境变量固定，网页里不能修改。要更换请修改 compose 后重启。
+      </div>
+      <form id="password-form" autocomplete="off">
+        <label>当前密码
+          <input id="old_password" type="password" autocomplete="current-password">
+        </label>
+        <label>新密码
+          <span class="hint">至少 8 位</span>
+          <input id="new_password" type="password" autocomplete="new-password">
+        </label>
+        <label>确认新密码
+          <input id="new_password2" type="password" autocomplete="new-password">
+        </label>
+        <button class="primary" type="submit">修改密码</button>
+      </form>
+      <div class="divider"></div>
+      <p class="muted small">
+        忘记密码时：在 compose 里设置 <code>ADMIN_PASSWORD</code> 后重启，即可用环境变量里的密码登录。
+      </p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const FIELDS = [
+    "ws_url", "ws_token",
+    "ollama_url", "ollama_model", "temperature", "num_predict", "system_prompt",
+    "tts_voice", "tts_rate", "tts_pitch", "tts_volume"
+  ];
+
+  let state = { values: {}, defaults: {}, meta: {} };
+  let statusTimer = null;
+  let toastTimer = null;
+
+  function showLogin() {
+    if (statusTimer) { clearInterval(statusTimer); statusTimer = null; }
+    $("app").hidden = true;
+    $("login").hidden = false;
+    const p = $("login-password");
+    if (p) { p.value = ""; setTimeout(() => p.focus(), 30); }
+  }
+
+  function showApp() {
+    $("login").hidden = true;
+    $("app").hidden = false;
+  }
+
+  function toast(message, isError) {
+    const el = $("toast");
+    el.textContent = message;
+    el.className = "toast show" + (isError ? " error" : "");
+    el.hidden = false;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
+  }
+
+  async function api(path, options) {
+    const opts = Object.assign({ credentials: "same-origin" }, options || {});
+    if (opts.body && !opts.headers) {
+      opts.headers = { "Content-Type": "application/json" };
+    }
+    const res = await fetch(path, opts);
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* ignore */ }
+    if (res.status === 401) {
+      showLogin();
+      throw new Error((data && data.error) || "请先登录");
+    }
+    if (!res.ok) {
+      throw new Error((data && data.error) || ("请求失败：" + res.status));
+    }
+    return data || {};
+  }
+
+  function applyValues(values) {
+    FIELDS.forEach((key) => {
+      const el = $(key);
+      if (!el) return;
+      const value = values[key];
+      el.value = (value === null || value === undefined) ? "" : String(value);
+    });
+    updateVoiceWarning();
+  }
+
+  function updateVoiceWarning() {
+    const v = ($("tts_voice").value || "").trim();
+    $("voice-warning").hidden = v !== "zh-CN-XiaoshuangNeural";
+  }
+
+  function markStatus(connected) {
+    const pill = $("ws-pill");
+    pill.textContent = connected ? "QQ 已连接" : "QQ 未连接";
+    pill.className = "pill " + (connected ? "ok" : "bad");
+  }
+
+  async function refreshStatus() {
+    try {
+      const s = await api("/api/status");
+      markStatus(!!s.ws_connected);
+      const parts = [];
+      if (s.model) parts.push("模型：" + s.model);
+      if (s.voice) parts.push("语音：" + s.voice);
+      $("status-meta").textContent = parts.join("　·　");
+      return s;
+    } catch (e) {
+      /* 401 已在 api() 里处理 */
+    }
+  }
+
+  async function boot() {
+    try {
+      const cfg = await api("/api/config");
+      state = cfg;
+      applyValues(cfg.values || {});
+      const fixed = !!(cfg.meta && cfg.meta.password_fixed_by_env);
+      $("password-fixed-note").hidden = !fixed;
+      ["old_password", "new_password", "new_password2"].forEach(function (id) {
+        $(id).disabled = fixed;
+      });
+      document.querySelector("#password-form button[type=submit]").disabled = fixed;
+      showApp();
+      await refreshStatus();
+      if (statusTimer) clearInterval(statusTimer);
+      statusTimer = setInterval(refreshStatus, 5000);
+    } catch (e) {
+      showLogin();
+    }
+  }
+
+  function collect(section) {
+    const v = (id) => $(id).value.trim();
+    if (section === "qq") {
+      return { ws_url: v("ws_url"), ws_token: v("ws_token") };
+    }
+    if (section === "ai") {
+      return {
+        ollama_url: v("ollama_url"),
+        ollama_model: v("ollama_model"),
+        temperature: Number($("temperature").value),
+        num_predict: Number($("num_predict").value),
+        system_prompt: $("system_prompt").value
+      };
+    }
+    return {
+      tts_voice: v("tts_voice"),
+      tts_rate: v("tts_rate"),
+      tts_pitch: v("tts_pitch"),
+      tts_volume: v("tts_volume")
+    };
+  }
+
+  async function saveSection(name, button) {
+    const values = collect(name);
+    button.disabled = true;
+    const oldText = button.textContent;
+    button.textContent = "保存中…";
+    try {
+      const res = await api("/api/save", {
+        method: "POST",
+        body: JSON.stringify({ values: values })
+      });
+      state.values = res.values || state.values;
+      applyValues(state.values);
+      if (res.reconnected) {
+        toast("已保存，正在用新配置重连 QQ…");
+        setTimeout(refreshStatus, 1500);
+      } else {
+        toast("已保存，下一条消息／语音生效");
+      }
+    } catch (e) {
+      toast(e.message, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = oldText;
+    }
+  }
+
+  async function resetSection(name, label) {
+    if (!window.confirm("确定把「" + label + "」恢复成默认值吗？")) return;
+    try {
+      const res = await api("/api/reset", {
+        method: "POST",
+        body: JSON.stringify({ section: name })
+      });
+      state.values = res.values || state.values;
+      applyValues(state.values);
+      toast("已恢复默认值");
+      if (name === "qq") setTimeout(refreshStatus, 1500);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  async function testOllama(button) {
+    button.disabled = true;
+    const oldText = button.textContent;
+    button.textContent = "测试中…";
+    $("ollama-result").textContent = "";
+    try {
+      const res = await api("/api/test/ollama", {
+        method: "POST",
+        body: JSON.stringify({
+          ollama_url: $("ollama_url").value.trim(),
+          ollama_model: $("ollama_model").value.trim()
+        })
+      });
+      if (res.ok) {
+        const names = (res.models || []).slice(0, 6).join("、");
+        $("ollama-result").textContent =
+          "连接成功，共 " + (res.models || []).length + " 个模型" +
+          (res.model_found ? "，已找到当前模型。" : "，但没有找到模型 " + res.model + "。") +
+          (names ? "（" + names + "）" : "");
+      } else {
+        $("ollama-result").textContent = "连接失败：" + res.error;
+      }
+    } catch (e) {
+      $("ollama-result").textContent = "连接失败：" + e.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = oldText;
+    }
+  }
+
+  $("login-form").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    const errorEl = $("login-error");
+    errorEl.hidden = true;
+    const button = this.querySelector("button[type=submit]");
+    button.disabled = true;
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: $("login-password").value })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "登录失败");
+      }
+      await boot();
+    } catch (e) {
+      errorEl.textContent = e.message;
+      errorEl.hidden = false;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("logout").addEventListener("click", async function () {
+    try { await api("/api/logout", { method: "POST", body: "{}" }); } catch (e) { /* ignore */ }
+    showLogin();
+    toast("已退出登录");
+  });
+
+  $("toggle-token").addEventListener("click", function () {
+    const input = $("ws_token");
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    this.textContent = show ? "隐藏" : "显示";
+  });
+
+  $("save-qq").addEventListener("click", function () { saveSection("qq", this); });
+  $("save-ai").addEventListener("click", function () { saveSection("ai", this); });
+  $("save-tts").addEventListener("click", function () { saveSection("tts", this); });
+  $("reset-qq").addEventListener("click", function () { resetSection("qq", "QQ 连接"); });
+  $("reset-ai").addEventListener("click", function () { resetSection("ai", "AI 设置"); });
+  $("reset-tts").addEventListener("click", function () { resetSection("tts", "语音"); });
+  $("test-ollama").addEventListener("click", function () { testOllama(this); });
+  $("tts_voice").addEventListener("input", updateVoiceWarning);
+
+  document.querySelectorAll(".tab").forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      document.querySelectorAll(".tab").forEach(function (t) {
+        t.classList.toggle("active", t === tab);
+      });
+      document.querySelectorAll(".panel").forEach(function (panel) {
+        panel.hidden = panel.id !== "panel-" + tab.dataset.tab;
+      });
+    });
+  });
+
+  $("password-form").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    const oldPassword = $("old_password").value;
+    const newPassword = $("new_password").value;
+    const confirm = $("new_password2").value;
+    if (newPassword !== confirm) {
+      toast("两次输入的新密码不一致", true);
+      return;
+    }
+    try {
+      await api("/api/password", {
+        method: "POST",
+        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+      });
+      toast("密码已修改，请重新登录");
+      showLogin();
+    } catch (e) {
+      toast(e.message, true);
+    }
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>

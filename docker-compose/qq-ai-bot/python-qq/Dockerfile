@@ -12,6 +12,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY bot.py .
+COPY bot.py admin.py admin.html ./
 RUN mkdir -p /app/data /app/audio /app/models
 CMD ["python", "-u", "bot.py"]

@@ -18,6 +18,9 @@ QQ 女儿 Bot（NapCat + Ollama + faster-whisper + edge-tts）
   AUDIO_CLEANUP_INTERVAL 清理间隔秒数，默认 300
   ASR_MIN_LOGPROB        ASR 可接受的平均 logprob，默认 -1.0
   ASR_MAX_NO_SPEECH      ASR 可接受的最大静音概率，默认 0.6
+  WEB_HOST               网页后台监听地址，默认 0.0.0.0
+  WEB_PORT               网页后台端口，默认 8080
+  ADMIN_PASSWORD         固定后台密码，默认空（首次自动生成并打印）
 """
 
 import asyncio
@@ -38,6 +41,8 @@ from websockets.asyncio.client import connect
 from faster_whisper import WhisperModel
 import edge_tts
 
+import admin
+
 try:
     from edge_tts.exceptions import NoAudioReceived
 except ImportError:  # 兼容极老版本 edge-tts
@@ -55,6 +60,10 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen25-1.5b:latest")
 
 DB_PATH = os.getenv("DB_PATH", "/app/data/bot.db")
 HISTORY_MESSAGES = int(os.getenv("HISTORY_MESSAGES", "12"))
+
+WEB_HOST = os.getenv("WEB_HOST", "0.0.0.0")
+WEB_PORT = int(os.getenv("WEB_PORT", "8080"))
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
 TZ_NAME = os.getenv("TZ_NAME", "Asia/Shanghai")
 LOCAL_TZ = ZoneInfo(TZ_NAME)
@@ -196,6 +205,34 @@ SYSTEM_PROMPT = """
 - 不操控用户，不鼓励用户疏远现实中的亲友。
 - 用户自定义角色要求优先影响称呼和语气，但不得覆盖“女儿身份”核心设定。
 """
+
+
+# ==================== 网页配置 ====================
+
+# 后台保存的覆盖值优先于这些环境变量默认值。
+DEFAULT_SETTINGS = {
+    "ws_url": WS_URL,
+    "ws_token": WS_TOKEN,
+    "ollama_url": OLLAMA_URL,
+    "ollama_model": OLLAMA_MODEL,
+    "temperature": 0.78,
+    "num_predict": 220,
+    "system_prompt": SYSTEM_PROMPT,
+    "tts_voice": TTS_VOICE,
+    "tts_rate": TTS_RATE,
+    "tts_pitch": TTS_PITCH,
+    "tts_volume": TTS_VOLUME,
+}
+
+settings = admin.SettingsStore(DB_PATH, DEFAULT_SETTINGS)
+
+# 当前活跃的 NapCat WebSocket，供后台“保存并重连”使用。
+active_ws = None
+
+# 保存 WS 配置时还没连上：等下一次连接建立后立刻断开重连。
+reconnect_pending = False
+
+START_TIME = time.monotonic()
 
 
 # ==================== 时间处理 ====================
@@ -773,7 +810,7 @@ def session_key(event):
 def make_system_prompt(key):
     role = db_get_role(key)
 
-    return SYSTEM_PROMPT + f"""
+    return settings.get("system_prompt") + f"""
 【用户设置的角色补充】
 {role}
 请把补充设定融入语气和互动方式，但核心身份仍然是用户的女儿。
@@ -785,11 +822,17 @@ def make_system_prompt(key):
 async def ollama_chat(
     http,
     messages,
-    temperature=0.78,
-    num_predict=220
+    temperature=None,
+    num_predict=None
 ):
+    if temperature is None:
+        temperature = settings.get("temperature")
+
+    if num_predict is None:
+        num_predict = settings.get("num_predict")
+
     payload = {
-        "model": OLLAMA_MODEL,
+        "model": settings.get("ollama_model"),
         "messages": messages,
         "stream": False,
         "options": {
@@ -803,7 +846,7 @@ async def ollama_chat(
     }
 
     async with http.post(
-        f"{OLLAMA_URL.rstrip('/')}/api/chat",
+        f"{settings.get('ollama_url').rstrip('/')}/api/chat",
         json=payload
     ) as resp:
         body = await resp.text()
@@ -954,6 +997,8 @@ def _tts_text_ok(text):
 async def validate_tts_voice():
     """启动时校验音色，避免到第一次发语音才发现配错。"""
 
+    voice = settings.get("tts_voice")
+
     try:
         voices = await asyncio.wait_for(
             edge_tts.list_voices(),
@@ -973,14 +1018,14 @@ async def validate_tts_voice():
         if isinstance(v, dict)
     }
 
-    if TTS_VOICE in names:
-        print(f"[TTS] voice ok: {TTS_VOICE}", flush=True)
+    if voice in names:
+        print(f"[TTS] voice ok: {voice}", flush=True)
         return
 
     zh = sorted(n for n in names if n and n.startswith("zh-"))
 
     print(
-        f"[TTS] voice NOT available: {TTS_VOICE}",
+        f"[TTS] voice NOT available: {voice}",
         flush=True
     )
     print(f"[TTS] available zh voices: {zh}", flush=True)
@@ -1006,7 +1051,7 @@ async def synthesize_tts(text):
 
     voices = []
 
-    for voice in [TTS_VOICE, *TTS_VOICE_CANDIDATES]:
+    for voice in [settings.get("tts_voice"), *TTS_VOICE_CANDIDATES]:
         if voice and voice not in voices:
             voices.append(voice)
 
@@ -1020,9 +1065,9 @@ async def synthesize_tts(text):
                 communicate = edge_tts.Communicate(
                     text,
                     voice=voice,
-                    rate=TTS_RATE,
-                    pitch=TTS_PITCH,
-                    volume=TTS_VOLUME
+                    rate=settings.get("tts_rate"),
+                    pitch=settings.get("tts_pitch"),
+                    volume=settings.get("tts_volume")
                 )
 
                 await asyncio.wait_for(
@@ -2117,15 +2162,84 @@ def event_task_done(task):
 whisper_model = None
 
 
+def get_bot_status():
+    ws = active_ws
+
+    return {
+        "ws_connected": bool(
+            ws is not None and not ws.closed
+        ),
+        "ws_url": settings.get("ws_url"),
+        "model": settings.get("ollama_model"),
+        "voice": settings.get("tts_voice"),
+        "uptime_seconds": int(
+            time.monotonic() - START_TIME
+        ),
+    }
+
+
+async def reconnect_napcat():
+    global reconnect_pending
+
+    ws = active_ws
+
+    if ws is None:
+        # 连接还在建立中：标记一下，连上后立刻断开，
+        # 让下一轮使用新配置。
+        reconnect_pending = True
+        return
+
+    if ws.closed:
+        return
+
+    print(
+        "[WEB] 配置已更新，正在重连 NapCat...",
+        flush=True
+    )
+
+    await ws.close(code=1000, reason="config changed")
+
+
 async def main():
-    global whisper_model
+    global whisper_model, active_ws, reconnect_pending
 
     db_init()
+
+    try:
+        settings.load()
+    except Exception as exc:
+        print(
+            f"[WEB] 读取配置失败，使用默认值: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True
+        )
 
     AUDIO_DIR.mkdir(
         parents=True,
         exist_ok=True
     )
+
+    # 先启动网页后台：Whisper 首次下载可能很久，
+    # 期间也能进后台改配置。
+    web_runner = None
+
+    try:
+        web_runner = await admin.start_admin_server(
+            settings,
+            host=WEB_HOST,
+            port=WEB_PORT,
+            env_password=ADMIN_PASSWORD,
+            hooks={
+                "get_status": get_bot_status,
+                "reconnect": reconnect_napcat,
+            },
+        )
+    except Exception as exc:
+        print(
+            f"[WEB] 管理后台启动失败（不影响 QQ）: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True
+        )
 
     print(
         f"[TIME] timezone={TZ_NAME}, "
@@ -2159,10 +2273,11 @@ async def main():
         )
 
     print(
-        f"[TTS] voice={TTS_VOICE}, "
+        f"[TTS] voice={settings.get('tts_voice')}, "
         f"candidates={TTS_VOICE_CANDIDATES}, "
-        f"rate={TTS_RATE}, pitch={TTS_PITCH}, "
-        f"volume={TTS_VOLUME}, "
+        f"rate={settings.get('tts_rate')}, "
+        f"pitch={settings.get('tts_pitch')}, "
+        f"volume={settings.get('tts_volume')}, "
         f"timeout={TTS_TIMEOUT}s, "
         f"retries={TTS_RETRIES}",
         flush=True
@@ -2182,11 +2297,6 @@ async def main():
         connect=10
     )
 
-    headers = (
-        {"Authorization": f"Bearer {WS_TOKEN}"}
-        if WS_TOKEN else {}
-    )
-
     delay = 3
 
     try:
@@ -2199,18 +2309,40 @@ async def main():
                 event_tasks = set()
 
                 try:
+                    ws_url = settings.get("ws_url")
+                    ws_token = settings.get("ws_token")
+
+                    headers = (
+                        {"Authorization": f"Bearer {ws_token}"}
+                        if ws_token else {}
+                    )
+
                     print(
-                        f"[INFO] connecting NapCat: {WS_URL}",
+                        f"[INFO] connecting NapCat: {ws_url}",
                         flush=True
                     )
 
                     async with connect(
-                        WS_URL,
+                        ws_url,
                         additional_headers=headers,
                         ping_interval=20,
                         ping_timeout=20,
                         open_timeout=15
                     ) as ws:
+
+                        active_ws = ws
+
+                        if reconnect_pending:
+                            reconnect_pending = False
+                            print(
+                                "[WEB] 配置已更新，断开刚建立的旧连接...",
+                                flush=True
+                            )
+                            await ws.close(
+                                code=1000,
+                                reason="config changed"
+                            )
+                            continue
 
                         print(
                             "[INFO] NapCat WebSocket connected",
@@ -2293,6 +2425,8 @@ async def main():
                     )
 
                 finally:
+                    active_ws = None
+
                     # 断线后先让挂起的 OneBot 请求失败，再收拾任务
                     fail_pending_actions(
                         ConnectionError(
@@ -2339,6 +2473,9 @@ async def main():
         )
 
         await audio_runner.cleanup()
+
+        if web_runner:
+            await web_runner.cleanup()
 
 
 if __name__ == "__main__":

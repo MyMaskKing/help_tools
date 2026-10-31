@@ -11,10 +11,11 @@
 ```text
 NapCat（QQ） ──WebSocket──▶ bot.py ──HTTP──▶ Ollama（大模型）
                               │
-                              ├── SQLite：历史 / 角色 / 语音偏好 / 主动陪伴
+                              ├── SQLite：历史 / 角色 / 语音偏好 / 主动陪伴 / 后台配置
                               ├── faster-whisper：语音 → 文字
                               ├── edge-tts：文字 → mp3
-                              └── aiohttp：把 mp3 暴露给 NapCat 下载
+                              ├── aiohttp：把 mp3 暴露给 NapCat 下载
+                              └── admin.py：网页后台（8080，配置 + 登录）
 ```
 
 具体功能：
@@ -26,6 +27,7 @@ NapCat（QQ） ──WebSocket──▶ bot.py ──HTTP──▶ Ollama（大�
 - 按需或按模式用语音回复（默认文字）
 - 早/中/晚三个时间段主动发起关心
 - 断线自动重连、语音失败自动回退文字
+- 网页后台：在线改模型、人设、音色、QQ WS，保存后尽量立即生效
 
 ---
 
@@ -33,10 +35,13 @@ NapCat（QQ） ──WebSocket──▶ bot.py ──HTTP──▶ Ollama（大�
 
 | 文件 | 作用 | 需要改吗 |
 | --- | --- | --- |
-| `bot.py` | 全部业务逻辑，单文件 | 改人格、改规则时才动 |
+| `bot.py` | 业务逻辑：消息、记忆、ASR/TTS、主动陪伴 | 改规则时才动 |
+| `admin.py` | 网页后台：配置存储、登录鉴权、HTTP API | 二次开发才动 |
+| `admin.html` | 后台页面（单页，无外部 CDN） | 改界面才动 |
 | `Dockerfile` | 构建镜像：Python 3.12 + ffmpeg + 依赖 | 一般不动 |
 | `requirements.txt` | `aiohttp` / `websockets` / `faster-whisper` / `edge-tts` | 一般不动 |
 | `docker-compose.yml` | 运行参数、挂载、环境变量 | 首次部署要检查 |
+| `tests/` | `unittest` 自动化测试，不进镜像 | 开发验证用 |
 | `data/` | 运行后生成，`bot.db` | 不要删 |
 | `audio/` | 运行后生成，临时 mp3 | 可删，自动清理 |
 | `models/` | 运行后生成，Whisper 缓存 | 可删，会重新下载 |
@@ -110,6 +115,11 @@ docker compose up -d --build
 | `TTS_PITCH` | `+2Hz` | 音调 |
 | `TTS_VOLUME` | `+0%` | 音量 |
 | `TZ_NAME` | `Asia/Shanghai` | 时区，影响主动陪伴 |
+| `WEB_HOST` | 未设置（默认 `0.0.0.0`） | 后台监听地址 |
+| `WEB_PORT` | `8080` | 后台端口 |
+| `ADMIN_PASSWORD` | 未设置 | 固定后台密码；设置后网页不能改密码 |
+
+> 网页后台保存过的配置存在 `data/bot.db`，**优先级高于上面的环境变量**；在后台点「恢复默认」后才会重新使用环境变量。
 
 > ⚠️ `zh-CN-XiaoshuangNeural` 是微软 Azure 付费音色，Edge TTS 免费接口里没有。用它时启动日志会出现 `[TTS] voice NOT available`，发语音会先失败一次再回退到 `zh-CN-XiaoyiNeural`。建议直接改成 Xiaoyi。
 
@@ -131,12 +141,70 @@ docker compose up -d --build
 
 ---
 
-## 6. 启动日志与自检
+## 6. 网页配置后台
+
+启动后默认监听 `0.0.0.0:8080`。第一次启动会在日志里打印：
+
+```text
+[WEB] admin listening on 0.0.0.0:8080
+[WEB] 首次登录密码: xxxxxxxxxxxx
+```
+
+浏览器打开 `http://服务器IP:8080`，或用 SSH 隧道访问 `http://127.0.0.1:8080`。完整使用说明见 [主文档 6.5](../README.md#65-网页管理后台不用改配置文件)。
+
+### 可配置项
+
+| 分区 | key | 说明 |
+| --- | --- | --- |
+| QQ 连接 | `ws_url` / `ws_token` | 保存后关闭当前 WS 并用新配置重连 |
+| AI | `ollama_url` / `ollama_model` / `temperature` / `num_predict` / `system_prompt` | 下一条消息生效 |
+| 语音 | `tts_voice` / `tts_rate` / `tts_pitch` / `tts_volume` | 下一条语音生效 |
+
+- 覆盖值写入 `data/bot.db` 的 `settings` 表，重启不丢；
+- 点「恢复默认」删除对应分区的覆盖值，回退到环境变量；
+- 网页值优先于 compose 环境变量。
+
+### API（二次开发）
+
+所有 `/api/*`（`/api/login` 除外）都要求登录 Cookie；POST 必须使用 `application/json`。
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/login` | `{"password": "..."}`，成功写 HttpOnly Cookie |
+| POST | `/api/logout` | 退出 |
+| GET | `/api/config` | 当前值、默认值、分区 |
+| POST | `/api/save` | `{"values": {...}}`，校验并保存 |
+| POST | `/api/reset` | `{"section": "qq\|ai\|tts"}` |
+| GET | `/api/status` | WS 状态、模型、音色、运行时长 |
+| POST | `/api/test/ollama` | 可选 `{"ollama_url","ollama_model"}`；不传则用已保存值 |
+| POST | `/api/password` | 修改后台密码（`ADMIN_PASSWORD` 固定时禁用） |
+
+### 安全设计
+
+- 密码 PBKDF2-HMAC-SHA256，20 万次迭代 + 随机盐；
+- 会话 Cookie：`HttpOnly`、`SameSite=Strict`、12 小时；
+- 同一 IP 连续失败 5 次锁定 60 秒；
+- 只提供 HTTP，没有 HTTPS，建议 SSH 隧道访问；
+- `ADMIN_PASSWORD` 环境变量可固定密码，同时禁用网页改密。
+
+### 测试
+
+```bash
+cd /root/docker-compose/qq-ai-bot/python-qq
+python -m unittest discover -s tests -v
+```
+
+测试需要本机 Python 3.12 和 `pip install -r requirements.txt` 的依赖（镜像里不包含 `tests/`）。测试覆盖配置存取/校验、登录鉴权/限流、保存/重置/改密，以及 Bot 读取配置的集成逻辑。
+
+---
+
+## 7. 启动日志与自检
 
 健康启动的关键几行：
 
 ```text
 [DB] database initialized
+[WEB] admin listening on 0.0.0.0:8080
 [ASR] Whisper ready
 [TTS] voice ok: zh-CN-XiaoyiNeural
 [TTS] audio server listening on 0.0.0.0:8123
@@ -146,6 +214,7 @@ docker compose up -d --build
 
 | 缺哪一行 | 说明 |
 | --- | --- |
+| `[WEB] admin listening` | 8080 被占用或启动失败；看同一行的异常，改 `WEB_PORT` |
 | `[ASR] Whisper ready` | 模型没加载，语音输入不可用；加 `HF_ENDPOINT` 或换网络 |
 | `[TTS] voice ok` | 音色不可用，参考第 5 节 |
 | `audio server listening` | 8123 端口没起来，检查端口占用 |
@@ -153,9 +222,9 @@ docker compose up -d --build
 
 ---
 
-## 7. 语音链路细节
+## 8. 语音链路细节
 
-### 7.1 语音输入（ASR）
+### 8.1 语音输入（ASR）
 
 1. 私聊发来 `record` 段；
 2. Bot 调 NapCat `get_record`，请求转成 wav；
@@ -173,7 +242,7 @@ docker compose up -d --build
 
 `logprob` 太低或 `no_speech` 太高时，会回复“没太听清”。
 
-### 7.2 语音回复（TTS）
+### 8.2 语音回复（TTS）
 
 1. `edge-tts` 合成 mp3 到 `/app/audio`；
 2. 内置 HTTP 服务暴露为 `http://172.17.0.1:8123/audio/<32位hex>.mp3`；
@@ -182,7 +251,7 @@ docker compose up -d --build
 
 只允许 32 位十六进制文件名，避免目录遍历；文件默认 600 秒后清理。
 
-### 7.3 失败回退
+### 8.3 失败回退
 
 - TTS 全部音色失败 → 自动改发文字，并打日志；
 - 开启持续语音模式时会先合成确认语，**发送成功才写入数据库**，避免“假开启”；
@@ -191,7 +260,7 @@ docker compose up -d --build
 
 ---
 
-## 8. 数据
+## 9. 数据
 
 `data/bot.db`（SQLite）包含：
 
@@ -201,6 +270,7 @@ docker compose up -d --build
 | `user_roles` | 自定义角色 |
 | `proactive_contacts` | 主动陪伴状态 |
 | `voice_preferences` | 语音模式开关 |
+| `settings` | 网页后台保存的覆盖值（含后台密码哈希，备份时注意保管） |
 
 备份：
 
@@ -212,19 +282,25 @@ tar czf bot-data-$(date +%F).tar.gz data
 
 ---
 
-## 9. 二次开发 / 调试
+## 10. 二次开发 / 调试
 
 ### 改人格
 
-编辑 `bot.py` 里的 `SYSTEM_PROMPT`（约 170～198 行），然后：
+优先在网页后台「AI 设置 → 人设提示词」改，保存后下一条消息生效。
+
+如果要改代码里的**默认值**，编辑 `bot.py` 的 `SYSTEM_PROMPT`（搜索变量名即可），然后：
 
 ```bash
 docker compose up -d --build
 ```
 
-### 改回复长度
+### 改回复长度 / 温度
 
-`ollama_chat()` 的 `num_predict`（默认 220）和 `temperature`（默认 0.78）。
+优先在网页后台「AI 设置」改，字段是 `num_predict`（默认 220）和 `temperature`（默认 0.78）。
+
+### 改 QQ WS
+
+优先在网页后台「QQ 连接」改，保存后自动重连；不需要重启容器。
 
 ### 改主动陪伴时间
 
@@ -253,7 +329,7 @@ docker compose config
 
 ---
 
-## 10. 已知限制
+## 11. 已知限制
 
 - 依赖 Linux 的 `network_mode: host` 和 `172.17.0.1` 网桥地址；Windows/macOS Docker Desktop 不适用。
 - 群聊只处理 @ 消息，且只回文字，不识别群语音。
@@ -261,10 +337,12 @@ docker compose config
 - CPU 推理 1.5B 模型通常 2～15 秒一条回复，属正常。
 - 默认只回文字；发语音不等于回语音，要显式要求或开启持续语音模式。
 - `tiny` 模型识别率一般，噪音环境下容易听错，可换 `small`。
+- 网页后台只提供 HTTP，没有 HTTPS；请用 SSH 隧道或限制来源 IP。
+- 网页保存的值优先于 compose 环境变量；改环境变量后要在后台「恢复默认」才生效。
 
 ---
 
-## 11. 相对旧版 `bot.py` 的修复
+## 12. 相对旧版 `bot.py` 的修复
 
 当前版本在原版基础上修了这些问题（来自文件头注释）：
 
@@ -279,9 +357,11 @@ docker compose config
 
 新增的环境变量：`TTS_VOICE_CANDIDATES`、`AUDIO_CLEANUP_MAX_AGE`、`AUDIO_CLEANUP_INTERVAL`、`ASR_MIN_LOGPROB`、`ASR_MAX_NO_SPEECH`。
 
+新增的网页后台（`admin.py` + `admin.html`）提供在线配置、登录鉴权和 Ollama 连通性测试，配置存入 `settings` 表，重启不丢。
+
 ---
 
-## 12. 排错速查
+## 13. 排错速查
 
 | 现象 | 先看 |
 | --- | --- |
@@ -290,6 +370,9 @@ docker compose config
 | 语音不识别 | `[ASR]` 日志、`/napcat-qq-data` 是否挂对、Whisper 是否加载 |
 | 只回文字 | `[TTS]` 日志、音色是否有效、`AUDIO_PUBLIC_BASE` 是否可达 |
 | 主动消息不发 | 时间段、4 小时闲置、当天是否已发、是否有历史 |
+| 网页后台打不开 | `[WEB]` 日志、8080 端口、防火墙、`WEB_PORT` |
+| 后台密码不对 | 首次密码在日志；忘了用 `ADMIN_PASSWORD` 或删密码记录 |
+| 后台改了不生效 | 看 `[WEB] 配置已更新`；WS 等重连；后台值优先于环境变量 |
 | 容器起不来 | `docker logs qwen-qq-bot`、端口占用、挂载路径 |
 
 完整排查步骤见 [主文档第 12 章](../README.md#12-故障排查按现象查)。

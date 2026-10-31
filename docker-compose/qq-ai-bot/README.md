@@ -7,6 +7,8 @@
 > - 成本：软件全部免费；需要一台能 7×24 开机的 Linux 服务器（2 核 4G 起步）
 
 > ⚠️ **先看系统要求**：本方案使用 `network_mode: host` 和 Docker 网桥地址 `172.17.0.1`，**只适用于 Linux**（云服务器、NAS、软路由、WSL2 里的 Ubuntu 都可以）。Windows / macOS 上的 Docker Desktop 不能直接照搬；Windows 用户请准备一台 Linux 云服务器，或在 WSL2 中安装 Docker Engine 后再按本文操作。
+>
+> 🖥️ 部署完成后，浏览器打开 `http://服务器IP:8080` 即可进入**网页管理后台**，换模型、改人设、换音色、改 QQ WS 都不用再改文件。详见 [6.5](#65-网页管理后台不用改配置文件)。
 
 ---
 
@@ -19,6 +21,7 @@
 - [4. 启动 Ollama（机器人的“大脑”）](#4-启动-ollama机器人的大脑)
 - [5. 部署 NapCat（机器人的“QQ 账号”）](#5-部署-napcat机器人的qq-账号)
 - [6. 构建并启动 Bot（机器人的“人格”）](#6-构建并启动-bot机器人的人格)
+  - [6.5 网页管理后台](#65-网页管理后台不用改配置文件)
 - [7. 验收：让它开口说话](#7-验收让它开口说话)
 - [8. 使用手册：命令、语音模式、主动陪伴](#8-使用手册命令语音模式主动陪伴)
 - [9. 日常运维：日志、更新、备份、迁移](#9-日常运维日志更新备份迁移)
@@ -42,7 +45,7 @@
 | --- | --- | --- | --- |
 | **NapCat** | 机器人的“手和耳朵”：登录 QQ、收消息、发消息、收发语音 | `QQ/docker-compose-qq.yml`（配套目录） | 3009 / 3010 / 6099 |
 | **Ollama** | 机器人的“大脑”：在本机运行大语言模型（Qwen2.5） | 本仓库根目录 `docker-compose.yml` | 11434 |
-| **Python Bot** | 机器人的“人格和记忆”：决定怎么回、回什么、什么时候主动说话；负责语音识别和语音合成 | `python-qq/` | 8123 |
+| **Python Bot** | 机器人的“人格和记忆”：决定怎么回、回什么、什么时候主动说话；负责语音识别、语音合成和网页后台 | `python-qq/` | 8123 / 8080 |
 | **QQ 小号** | 机器人对外展示的账号 | 你在 NapCat 里扫码登录 | — |
 
 它们之间的关系：
@@ -55,6 +58,7 @@ flowchart LR
     B -->|"HTTP 8123 提供 mp3"| N
     B <-->|"HTTPS"| T["微软 Edge TTS<br/>文字转语音"]
     B -->|"首次启动下载"| H["HuggingFace<br/>Whisper 语音识别模型"]
+    W["浏览器 管理后台<br/>:8080"] <-->|"HTTP + 密码"| B
 ```
 
 **用一句话理解数据流**：你在 QQ 发一句话 → NapCat 收到后通过 WebSocket 转给 Bot → Bot 去问 Ollama 怎么回答 → Bot 把回答发回 NapCat → NapCat 用机器人的 QQ 号发给你。语音消息则多两步：先由 Whisper 转成文字，回答再由 Edge TTS 转成 mp3，NapCat 再作为语音发出去。
@@ -67,6 +71,7 @@ flowchart LR
 - 群聊里被 @ 时回复（群聊只回文字）
 - 自定义角色：`/角色 温柔姐姐`、`/角色 默认`
 - 每天早/中/晚三个时段，在你 4 小时没说话时主动关心你
+- 网页管理后台：不改配置文件就能换模型、人设、音色和 QQ WS 连接，配置重启不丢
 - 聊天记录和大模型推理都在你自己的服务器上，不经过第三方 AI 接口（语音合成除外，见第 13 章）
 
 ---
@@ -212,6 +217,9 @@ systemctl restart docker
         ├── Dockerfile
         ├── requirements.txt
         ├── bot.py
+        ├── admin.py                     # 网页后台（配置 / API / 登录）
+        ├── admin.html                   # 后台页面
+        ├── tests/                       # 自动化测试（不进镜像）
         ├── data/                        # 自动生成，bot.db
         ├── audio/                       # 自动生成，临时 mp3
         └── models/                      # 自动生成，Whisper 模型
@@ -284,7 +292,7 @@ Bot 本身放在哪个目录都行（比如旧的 `/root/docker-compose/ai-bot/p
 ```
 
 - `OLLAMA_MODEL` 必须和 `docker exec -it ollama ollama list` 里显示的名字**一模一样**。第 4 章会教你创建一个叫 `qwen25-1.5b:latest` 的别名。
-- `TTS_VOICE` 建议改成 **`zh-CN-XiaoyiNeural`**。原因见 [附录 C](#附录-c相对旧版的变化与已知坑)：`zh-CN-XiaoshuangNeural` 是微软付费音色，Edge TTS 免费接口里没有，启动时会提示 `voice NOT available`，虽然能自动回退，但日志会一直报警。
+- `TTS_VOICE` 建议改成 **`zh-CN-XiaoyiNeural`**。原因见 [附录 C](#附录-c相对旧版的变化与已知坑)：`zh-CN-XiaoshuangNeural` 是微软付费音色，Edge TTS 免费接口里没有，启动时会提示 `voice NOT available`，虽然能自动回退，但日志会一直报警。启动后也可以直接在网页后台「语音」页改（见 6.5），不用改这里。
 
 改完后可以用一条命令确认：
 
@@ -581,6 +589,9 @@ docker compose logs -f qwen-qq-bot
 
 ```text
 [DB] database initialized
+[WEB] admin listening on 0.0.0.0:8080
+[WEB] 浏览器打开 http://服务器IP:8080
+[WEB] 首次登录密码: Ab3dEf6hIj9k
 [TIME] timezone=Asia/Shanghai, current=2026-10-31 16:00:00
 [ASR] loading Whisper tiny (cpu/int8)...
 [ASR] Whisper ready
@@ -599,13 +610,17 @@ docker compose logs -f qwen-qq-bot
 | 日志 | 含义 |
 | --- | --- |
 | `[DB] database initialized` | 数据库建好了 |
+| `[WEB] admin listening` | 网页后台已启动 |
+| `[WEB] 首次登录密码` | 只在第一次生成密码时打印，请立刻记下 |
 | `[ASR] Whisper ready` | 语音识别模型加载成功 |
 | `[TTS] voice ok` | 语音合成音色可用 |
 | `audio server listening` | 语音文件服务器已启动（给 NapCat 下载 mp3 用） |
 | `NapCat WebSocket connected` | **最关键**：已连上 QQ |
 | `[PROACTIVE] ... started` | 主动陪伴定时器已启动 |
 
-> 如果卡在 `[ASR] loading Whisper tiny...` 很久，是在从 HuggingFace 下载模型，国内网络可能很慢甚至失败。看 6.3。
+> 如果设置了 `ADMIN_PASSWORD`，日志会变成“管理密码使用 ADMIN_PASSWORD 环境变量”，不会打印明文。
+>
+> 如果卡在 `[ASR] loading Whisper tiny...` 很久，是在从 HuggingFace 下载模型，国内网络可能很慢甚至失败。看 6.3。此时网页后台已经可以打开，不用干等。
 
 按 `Ctrl + C` 退出日志查看（不会停容器）。
 
@@ -642,8 +657,116 @@ docker compose logs -f
 - [ ] 日志有 `[ASR] Whisper ready`
 - [ ] 日志有 `[TTS] voice ok`
 - [ ] 日志有 `[INFO] NapCat WebSocket connected`
+- [ ] `http://服务器IP:8080` 能打开网页后台（或 SSH 隧道后能打开）
 
 都满足，就可以去 QQ 里测试了。
+
+### 6.5 网页管理后台（不用改配置文件）
+
+Bot 启动时会额外开一个网页后台，默认端口 **8080**。以后换模型、改人设、换音色、改 QQ 的 WS 地址和 Token，都不需要再 SSH 改 `docker-compose.yml`。
+
+> 8080 是管理后台；8123 是给 NapCat 下载语音文件的内部端口，两者不要混。
+
+#### 打开后台
+
+**方式 A：服务器/局域网能访问 8080**
+
+浏览器打开：
+
+```text
+http://你的服务器IP:8080
+```
+
+需要先在云安全组或防火墙放行 8080（只建议放行你自己的 IP）。
+
+**方式 B（更安全）：SSH 隧道**
+
+在你自己的电脑上执行：
+
+```bash
+ssh -L 8080:127.0.0.1:8080 root@你的服务器IP
+```
+
+保持窗口不关，浏览器打开：
+
+```text
+http://127.0.0.1:8080
+```
+
+#### 第一次登录
+
+密码会打印在 Bot 启动日志里：
+
+```bash
+cd /root/docker-compose/qq-ai-bot/python-qq
+docker compose logs qwen-qq-bot | grep WEB
+```
+
+首次启动会看到类似：
+
+```text
+[WEB] admin listening on 0.0.0.0:8080
+[WEB] 浏览器打开 http://服务器IP:8080
+[WEB] 首次登录密码: Ab3dEf6hIj9k
+```
+
+把 `首次登录密码` 后面的字符串填进登录框即可。这个密码只在**第一次生成时**打印一次，之后会以哈希形式保存在 `data/bot.db`，重启不再打印。
+
+如果 compose 里设置了 `ADMIN_PASSWORD`，日志会显示“管理密码使用 ADMIN_PASSWORD 环境变量”，此时密码以环境变量为准。
+
+#### 后台能改什么
+
+| 分区 | 可改内容 | 生效时间 |
+| --- | --- | --- |
+| QQ 连接 | WebSocket 地址、Token | 保存后自动断开并重连（约 3 秒） |
+| AI 设置 | Ollama 地址、模型名、温度、回复长度、人设提示词 | 下一条消息生效 |
+| 语音 | 音色、语速、音调、音量 | 下一条语音生效 |
+| 安全 | 修改后台密码 | 立即生效，需要重新登录 |
+
+几个细节：
+
+- **AI 设置**里可以点「测试 Ollama 连接」，会显示连接是否成功、当前模型是否在模型列表里。
+- **人设提示词**就是 `SYSTEM_PROMPT`，改完保存即可；点「恢复默认」可以还原内置的女儿人设。
+- **音色**输入框内置了 20 多个常用中文音色（晓伊、晓晓、云希、云健、东北话、粤语、台湾腔等），点输入框右侧箭头选择，也可以直接输入任意 Edge TTS 音色名。
+- `zh-CN-XiaoshuangNeural`（晓双）是 Azure 付费音色，Edge TTS 免费接口里没有；选它时页面会提示，实际会自动回退到备用音色。
+- **QQ 连接**保存后，页面右上角的状态会短暂变成“未连接”，随后自动重连；如果一直连不上，检查 Token 和 NapCat 的网络配置。
+
+#### 默认值和“恢复默认”
+
+后台第一次打开时，所有字段都等于当前环境变量的值（也就是你现在能正常运行的配置），不需要重新填。
+
+- 你保存过的值会覆盖环境变量，写入 `data/bot.db` 的 `settings` 表，重启容器仍然有效；
+- 点某个分区的「恢复默认」，会删除该分区的覆盖值，重新使用 `docker-compose.yml` 里的环境变量；
+- 如果你改了 compose 里的环境变量但后台有旧覆盖值，**后台的值优先**；想用新的环境变量，先在后台点「恢复默认」。
+
+#### 后台改密码 / 忘记密码
+
+- 在「安全」页可以修改密码（至少 8 位），改完当前会话立即失效，需要重新登录。
+- 如果忘记密码：在 `python-qq/docker-compose.yml` 里取消这一行注释并改成你的密码，然后重启：
+
+  ```yaml
+  - ADMIN_PASSWORD=你的新密码
+  ```
+
+  设置 `ADMIN_PASSWORD` 后，网页里不能改密码，密码以环境变量为准。
+- 也可以删除数据库里的密码记录（未设置 `ADMIN_PASSWORD` 时会重新生成并打印）：
+
+  ```bash
+  docker exec -it qwen-qq-bot python -c "
+  import sqlite3
+  db = sqlite3.connect('/app/data/bot.db')
+  db.execute(\"delete from settings where key='_admin_password_hash'\")
+  db.commit()
+  "
+  docker compose restart
+  ```
+
+#### 安全提醒
+
+- 后台只有 HTTP，没有 HTTPS；**不要直接暴露到公网**，优先用 SSH 隧道或只允许自己的 IP 访问 8080。
+- 建议登录后在「安全」页把密码改成强密码。
+- 连续输错 5 次会锁定 60 秒；这是正常保护，等一分钟再试。
+- 后台能改 QQ Token 和模型，等同于服务器控制权，不要把 8080 借给别人。
 
 ---
 
@@ -773,10 +896,10 @@ docker compose logs -f
 
 机器人的人格由两部分叠加：
 
-1. **核心人设**：`bot.py` 里的 `SYSTEM_PROMPT`（约 170～198 行），固定为“用户的女儿”，不可被 `/角色` 覆盖；
+1. **核心人设**：`bot.py` 里的 `SYSTEM_PROMPT`（搜索这个变量名即可），固定为“用户的女儿”，不可被 `/角色` 覆盖；
 2. **补充设定**：`/角色 xxx` 设置的描述，只影响称呼和语气。
 
-想彻底改造人格，编辑 `python-qq/bot.py` 里的 `SYSTEM_PROMPT`，保存后：
+想彻底改造人格，**优先在网页后台「AI 设置 → 人设提示词」改**（保存后下一条消息生效）。如果要改代码里的默认值，编辑 `python-qq/bot.py` 里的 `SYSTEM_PROMPT`，保存后：
 
 ```bash
 docker compose up -d --build
@@ -844,8 +967,8 @@ docker compose up -d --build
 ### 8.6 回复长度和风格
 
 - 普通回复最多约 220 token（约 150～300 字），主动消息更短；
-- 想让它话更少/更多，改 `bot.py` 里 `ollama_chat` 的 `num_predict`（默认 220）；
-- 想更活泼/更稳定，改 `temperature`（默认 0.78，越高越发散）。
+- 想让它话更少/更多，在网页后台「AI 设置」改「回复长度」（`num_predict`，默认 220）；
+- 想更活泼/更稳定，在网页后台改「温度」（默认 0.78，越高越发散）。
 
 ---
 
@@ -894,11 +1017,20 @@ docker compose down
 
 ### 9.3 改配置的正确姿势
 
+**优先用网页后台（6.5）**：模型、人设、音色、QQ WS 都能在线改，保存即生效，不用重启。
+
+只有下面这些情况才需要改 `docker-compose.yml`：
+
+- 端口、挂载路径、Whisper 模型、时区、后台端口等“基础设施”配置；
+- 想修改网页后台的默认值（改完还要在后台点一次「恢复默认」，否则旧覆盖值仍然优先）。
+
+改 compose 的流程：
+
 1. 编辑对应的 `docker-compose.yml`；
 2. 在同一个目录执行 `docker compose up -d`（会自动重建有变化的容器）；
 3. 看日志确认没问题。
 
-> 只改 `bot.py` 这类代码，需要加 `--build`：`docker compose up -d --build`。
+> 只改 `bot.py`、`admin.py`、`admin.html` 这类代码，需要加 `--build`：`docker compose up -d --build`。
 
 ### 9.4 更新
 
@@ -937,7 +1069,7 @@ tar czf /root/qqbot-backup-$(date +%F).tar.gz \
 ```
 
 - `QQ/data`：QQ 登录态、聊天文件、NapCat 配置；
-- `qq-ai-bot/python-qq/data`：`bot.db`（聊天记录、角色、语音偏好、主动陪伴状态）。
+- `qq-ai-bot/python-qq/data`：`bot.db`（聊天记录、角色、语音偏好、主动陪伴状态、网页后台配置和密码哈希）。
 
 可选：`qq-ai-bot/ollama_data`（模型文件，几个 GB，网络差时值得备份）、`python-qq/models`（Whisper 缓存）。
 
@@ -1014,6 +1146,8 @@ cd /root/docker-compose/qq-ai-bot && docker compose up -d --force-recreate
 
 在 `python-qq/docker-compose.yml` 的 `environment:` 下配置。未写的会使用默认值。
 
+> 网页后台保存过的值存在 `data/bot.db`，**优先级高于这里的环境变量**；在后台点「恢复默认」后，才会重新使用环境变量的值。
+
 | 变量 | 默认值 | 本仓库 compose 里的值 | 作用 / 什么时候改 |
 | --- | --- | --- | --- |
 | `WS_URL` | `ws://127.0.0.1:3010` | 同左 | NapCat WebSocket 地址；改了端口映射才改 |
@@ -1023,6 +1157,9 @@ cd /root/docker-compose/qq-ai-bot && docker compose up -d --force-recreate
 | `DB_PATH` | `/app/data/bot.db` | 默认 | SQLite 路径，一般不用改 |
 | `HISTORY_MESSAGES` | `12` | 默认 | 带多少条历史；太大费内存、变慢 |
 | `TZ_NAME` | `Asia/Shanghai` | 同左 | 时区，影响主动陪伴时间段 |
+| `WEB_HOST` | `0.0.0.0` | 未设置 | 网页后台监听地址；只允许本机访问可改 `127.0.0.1` |
+| `WEB_PORT` | `8080` | `8080` | 网页后台端口；被占用时改这里 |
+| `ADMIN_PASSWORD` | 空 | 未设置 | 固定后台密码；设置后网页里不能改密码 |
 | `NAPCAT_PATH_PREFIX` | `/app/.config/QQ` | 同左 | NapCat 返回路径的前缀，一般不用改 |
 | `NAPCAT_DATA_DIR` | `/napcat-qq-data` | 同左 | Bot 容器里 NapCat 数据的挂载点 |
 | `AUDIO_DIR` | `/app/audio` | Dockerfile 固定 | 生成的 mp3 存放目录 |
@@ -1430,11 +1567,66 @@ dmesg | grep -i -E "oom|killed process"
 | `bot.db` 损坏 | 停容器，备份后删除 `data/bot.db`，重启自动重建（会失忆） |
 | 想彻底重置 | 停容器，`rm -rf /root/docker-compose/qq-ai-bot/python-qq/data`，重启 |
 
-### 12.12 日志关键词速查
+### 12.12 网页后台相关
+
+**8080 打不开：**
+
+```bash
+# 1. 容器是否在跑
+docker ps | grep qwen-qq-bot
+
+# 2. 后台有没有启动、端口是多少
+docker logs qwen-qq-bot 2>&1 | grep WEB
+
+# 3. 端口有没有监听
+ss -lntp | grep 8080
+
+# 4. 服务器本机能不能访问
+curl -I http://127.0.0.1:8080
+```
+
+- 日志里有 `[WEB] admin listening on 0.0.0.0:8080`，但浏览器打不开 → 云安全组/防火墙没放行 8080，改用 SSH 隧道（6.5）。
+- 日志里有 `[WEB] 管理后台启动失败 ... Address already in use` → 8080 被占用，改 `WEB_PORT` 后 `docker compose up -d`。
+- 完全没有 `[WEB]` 日志 → 镜像还是旧的，`docker compose up -d --build` 重建。
+
+**密码不对 / 忘了密码：**
+
+- 首次密码只在第一次生成时打印一次。用 `docker compose logs qwen-qq-bot | grep 首次登录密码` 找；如果已经重启过，日志里不会再有。
+- 最快的恢复方式：在 compose 里设置 `ADMIN_PASSWORD=你的新密码`，重启；之后密码以环境变量为准。
+- 或者删除数据库里的密码记录（未设置 `ADMIN_PASSWORD` 时）：
+
+  ```bash
+  docker exec -it qwen-qq-bot python -c "
+  import sqlite3
+  db = sqlite3.connect('/app/data/bot.db')
+  db.execute(\"delete from settings where key='_admin_password_hash'\")
+  db.commit()
+  "
+  cd /root/docker-compose/qq-ai-bot/python-qq && docker compose restart
+  ```
+
+  重启后日志会打印新的随机密码。
+
+- 连续输错 5 次会返回“尝试次数过多”，等 60 秒再试。
+
+**改了配置但不生效：**
+
+1. 看日志有没有 `[WEB] 配置已更新: ...`；
+2. 改 QQ WS 后等 3～5 秒，右上角状态应重新变成“QQ 已连接”；一直连不上就检查 Token；
+3. 改模型后点「测试 Ollama 连接」，确认 `model_found`；
+4. 改音色后下一条语音才生效；如果选的是 Xiaoshuang，会自动回退，属正常；
+5. 如果 compose 环境变量和后台值冲突，**后台值优先**，点「恢复默认」才会用环境变量。
+
+**后台密码改了之后被踢出登录：**
+
+正常。修改密码会清空所有会话，用新密码重新登录即可。
+
+### 12.13 日志关键词速查
 
 | 关键词 | 含义 |
 | --- | --- |
 | `[DB]` | 数据库初始化 |
+| `[WEB]` | 网页后台监听、密码、配置更新、重连 |
 | `[TIME]` | 时区与当前时间 |
 | `[ASR]` | 语音识别 |
 | `[TTS]` | 语音合成 / 音频服务 / 清理 |
@@ -1454,17 +1646,19 @@ dmesg | grep -i -E "oom|killed process"
 1. **改掉默认 Token。**
    默认 `cyj123456` 是公开的。改的时候要同步改三处：
    - NapCat WebUI 里 WebSocket 服务器的 Token；
-   - Bot 的 `WS_TOKEN`；
+   - Bot 的 `WS_TOKEN`（或网页后台「QQ 连接」）；
    - `QQ/docker-compose-qq.yml` 里 healthcheck 的 Token（可选）。
 
 2. **不要把这些端口暴露到公网：**
-   `3009`（HTTP）、`3010`（WS）、`6099`（WebUI）、`8123`（语音文件）、`11434`（Ollama）。
+   `8080`（网页后台）、`3009`（HTTP）、`3010`（WS）、`6099`（WebUI）、`8123`（语音文件）、`11434`（Ollama）。
    只开你需要的 SSH；WebUI 用 SSH 隧道访问最安全。Ollama 使用 host 网络，若服务器防火墙全开，11434 会直接暴露，建议用 `ufw` / 云安全组限制来源。
 
    如果必须开放，至少：
    - 改强密码/Token；
    - 云安全组限制来源 IP；
    - 不要用弱口令。
+
+   网页后台优先走 SSH 隧道（6.5），不要直接把 8080 暴露给所有人。
 
 3. **QQ 账号风险自担。**
    非官方协议登录有封号可能。用小号、别发广告、别高频操作。
@@ -1481,6 +1675,9 @@ dmesg | grep -i -E "oom|killed process"
 
 6. **不要让机器人参与“机器人对机器人”的对话。**
    两个 Bot 互相 @ 可能形成无限循环，快速消耗资源并触发风控。
+
+7. **网页后台等同于服务器控制权。**
+   它能改 QQ Token、模型地址和人设。默认只有密码保护、没有 HTTPS；请用强密码，并尽量只在内网/SSH 隧道下访问。不要把 8080 借给别人，也不要把后台密码写进公开仓库。
 
 ---
 
@@ -1603,7 +1800,7 @@ NapCat 返回：/app/.config/QQ/nt_qq_123456/ptt/abc.wav
 
 机器人仍然能发语音，因为代码会自动回退到 `zh-CN-XiaoyiNeural` / `zh-CN-XiaoxiaoNeural`，但每次发语音都会先失败一次、多打一行日志。
 
-**建议直接把 compose 里的 `TTS_VOICE` 改成 `zh-CN-XiaoyiNeural`。**
+**建议在网页后台「语音」页把音色改成 `zh-CN-XiaoyiNeural`，或直接改 compose 里的 `TTS_VOICE`。**
 
 ### C.3 已知坑：`qwen25-1.5b:latest` 是别名，不是官方模型名
 
@@ -1636,6 +1833,8 @@ Windows / macOS 的 Docker Desktop 对 host 网络支持有限，且 `172.17.0.1
 - [ ] `curl .../get_login_info` 返回机器人 QQ 号
 - [ ] Bot 日志出现 `[INFO] NapCat WebSocket connected`
 - [ ] Bot 日志出现 `[ASR] Whisper ready`
+- [ ] 网页后台 `http://服务器IP:8080` 能打开并登录
+- [ ] 后台改一个设置并保存，刷新后仍然是新值
 - [ ] 私聊文字有回复
 - [ ] 私聊语音能识别（日志有 `[ASR] ... text=`）
 - [ ] “用语音回复我”能收到语音
@@ -1643,7 +1842,8 @@ Windows / macOS 的 Docker Desktop 对 host 网络支持有限，且 `172.17.0.1
 - [ ] `/帮助`、`/角色`、`/清空` 正常
 - [ ] 已备份 `QQ/data` 和 `python-qq/data`
 - [ ] 已修改默认 Token（可选但建议）
-- [ ] 6099 / 3009 / 3010 / 8123 / 11434 未直接暴露公网
+- [ ] 已修改后台密码，或已用 `ADMIN_PASSWORD` 固定（建议）
+- [ ] 8080 / 6099 / 3009 / 3010 / 8123 / 11434 未直接暴露公网
 
 全部打勾，恭喜你，机器人正式上线 🎉
 

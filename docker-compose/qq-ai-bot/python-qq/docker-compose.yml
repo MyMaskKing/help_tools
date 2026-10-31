@@ -15,12 +15,15 @@ services:
       - WHISPER_MODEL=tiny
       - WHISPER_DEVICE=cpu
       - WHISPER_COMPUTE=int8
-      # Edge-TTS 软糯儿童女声：晓双
+      # 默认沿用旧值；建议在网页后台「语音」页改成 zh-CN-XiaoyiNeural
       - TTS_VOICE=zh-CN-XiaoshuangNeural
       - TTS_RATE=-5%
       - TTS_PITCH=+2Hz
       - TTS_VOLUME=+0%
       - TZ_NAME=Asia/Shanghai
+      - WEB_PORT=8080
+      # 想固定后台密码时取消下一行注释（至少 8 位）
+      # - ADMIN_PASSWORD=change-me-please
     volumes:
       - ./data:/app/data
       - /root/docker-compose/QQ/data/QQ:/napcat-qq-data:ro
