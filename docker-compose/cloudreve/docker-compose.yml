@@ -1,0 +1,28 @@
+services:
+  cloudreve:
+    image: cloudreve/cloudreve:latest
+    container_name: cloudreve
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+     # 延长HTTP读写超时到10分钟，杜绝慢传断开
+      HTTP_READ_TIMEOUT: 1200
+      HTTP_WRITE_TIMEOUT: 1200
+    ports:
+      - "5212:5212"
+    volumes:
+      - ./data:/cloudreve/data
+      - ./uploads:/cloudreve/uploads
+      - ./avatar:/cloudreve/avatar
+      - ./conf:/cloudreve/conf
+      - ./cache:/cloudreve/cache
+    # 调高系统打开文件数限制，大量上传不会句柄耗尽卡死
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    # TCP保活内核参数，适配低速长连接
+    sysctls:
+      net.ipv4.tcp_keepalive_time: 15
+      net.ipv4.tcp_keepalive_intvl: 5
+      net.ipv4.tcp_keepalive_probes: 3
