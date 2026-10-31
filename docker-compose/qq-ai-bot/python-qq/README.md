@@ -152,6 +152,8 @@ docker compose up -d --build
 
 浏览器打开 `http://服务器IP:8080`，或用 SSH 隧道访问 `http://127.0.0.1:8080`。完整使用说明见 [主文档 6.5](../README.md#65-网页管理后台不用改配置文件)。
 
+> 页面右上角的“QQ 通道”表示 Bot 与 NapCat 的 WebSocket 是否连通，不是 QQ 账号的登录状态；QQ 是否登录看 NapCat WebUI。
+
 ### 可配置项
 
 | 分区 | key | 说明 |
@@ -175,7 +177,7 @@ docker compose up -d --build
 | GET | `/api/config` | 当前值、默认值、分区 |
 | POST | `/api/save` | `{"values": {...}}`，校验并保存 |
 | POST | `/api/reset` | `{"section": "qq\|ai\|tts"}` |
-| GET | `/api/status` | WS 状态、模型、音色、运行时长 |
+| GET | `/api/status` | WS 状态、模型、音色、运行时长（WS 指 Bot↔NapCat 通道） |
 | POST | `/api/test/ollama` | 可选 `{"ollama_url","ollama_model"}`；不传则用已保存值 |
 | POST | `/api/password` | 修改后台密码（`ADMIN_PASSWORD` 固定时禁用） |
 

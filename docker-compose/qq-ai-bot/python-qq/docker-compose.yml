@@ -23,7 +23,7 @@ services:
       - TZ_NAME=Asia/Shanghai
       - WEB_PORT=8080
       # 想固定后台密码时取消下一行注释（至少 8 位）
-      # - ADMIN_PASSWORD=change-me-please
+      - ADMIN_PASSWORD=12345678
     volumes:
       - ./data:/app/data
       - /root/docker-compose/QQ/data/QQ:/napcat-qq-data:ro

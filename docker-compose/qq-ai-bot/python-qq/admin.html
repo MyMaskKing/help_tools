@@ -113,7 +113,7 @@
     margin-top: -1px;
     margin-bottom: 4px;
   }
-  input, textarea {
+  input, textarea, select {
     width: 100%;
     border: 1px solid #d1d5db;
     border-radius: 9px;
@@ -123,10 +123,12 @@
     background: #fff;
     outline: none;
   }
-  input:focus, textarea:focus {
+  select { cursor: pointer; }
+  input:focus, textarea:focus, select:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
   }
+  #tts_voice_custom { margin-top: 8px; }
   textarea {
     resize: vertical;
     min-height: 220px;
@@ -230,6 +232,7 @@
   <form id="login-form" class="card login-card" autocomplete="off">
     <h1>QQ AI 机器人</h1>
     <p class="muted">请输入管理密码。首次部署的密码会打印在容器启动日志里。</p>
+    <p class="muted small">管理后台 v1.2</p>
     <label>管理密码
       <input id="login-password" type="password" autocomplete="current-password" required autofocus>
     </label>
@@ -240,7 +243,7 @@
 
 <div id="app" hidden>
   <header class="topbar">
-    <div class="brand">QQ AI 机器人<span>管理后台</span></div>
+    <div class="brand">QQ AI 机器人<span>管理后台 v1.2</span></div>
     <div class="top-actions">
       <span id="ws-pill" class="pill">未连接</span>
       <button id="logout" class="ghost" type="button">退出</button>
@@ -314,42 +317,48 @@
       <p class="muted">修改后下一条语音生效。Edge TTS 是免费接口，推荐使用中文音色。</p>
       <div class="grid">
         <label>音色
-          <span class="hint">点输入框右侧箭头选择，也可以直接输入任意 Edge TTS 音色名</span>
-          <input id="tts_voice" list="voice-options" spellcheck="false">
-          <datalist id="voice-options">
-            <!-- 普通话女声 -->
-            <option value="zh-CN-XiaoyiNeural" label="晓伊 · 活泼少女（推荐）"></option>
-            <option value="zh-CN-XiaoxiaoNeural" label="晓晓 · 温柔女声（推荐）"></option>
-            <option value="zh-CN-XiaochenNeural" label="晓辰 · 女声"></option>
-            <option value="zh-CN-XiaohanNeural" label="晓涵 · 女声"></option>
-            <option value="zh-CN-XiaomengNeural" label="晓梦 · 女声"></option>
-            <option value="zh-CN-XiaomoNeural" label="晓墨 · 女声"></option>
-            <option value="zh-CN-XiaoqiuNeural" label="晓秋 · 女声"></option>
-            <option value="zh-CN-XiaoruiNeural" label="晓睿 · 女声"></option>
-            <option value="zh-CN-XiaoxuanNeural" label="晓萱 · 女声"></option>
-            <option value="zh-CN-XiaoyanNeural" label="晓颜 · 女声"></option>
-            <option value="zh-CN-XiaozhenNeural" label="晓甄 · 女声"></option>
-            <!-- 普通话童声 -->
-            <option value="zh-CN-XiaoyouNeural" label="晓悠 · 童声"></option>
-            <option value="zh-CN-XiaoshuangNeural" label="晓双 · 童声（Azure 付费，Edge 不可用）"></option>
-            <!-- 普通话男声 -->
-            <option value="zh-CN-YunxiNeural" label="云希 · 阳光少年（推荐）"></option>
-            <option value="zh-CN-YunjianNeural" label="云健 · 男声"></option>
-            <option value="zh-CN-YunyangNeural" label="云扬 · 新闻男声"></option>
-            <option value="zh-CN-YunxiaNeural" label="云夏 · 男童"></option>
-            <option value="zh-CN-YunyeNeural" label="云野 · 男声"></option>
-            <option value="zh-CN-YunzeNeural" label="云泽 · 老年男声"></option>
-            <!-- 方言 -->
-            <option value="zh-CN-liaoning-XiaobeiNeural" label="晓北 · 东北话"></option>
-            <option value="zh-CN-shaanxi-XiaoniNeural" label="晓妮 · 陕西话"></option>
-            <!-- 粤语 / 台湾 -->
-            <option value="zh-HK-HiuGaaiNeural" label="曉佳 · 粤语女声"></option>
-            <option value="zh-HK-HiuMaanNeural" label="曉曼 · 粤语女声"></option>
-            <option value="zh-HK-WanLungNeural" label="雲龍 · 粤语男声"></option>
-            <option value="zh-TW-HsiaoChenNeural" label="曉臻 · 台湾女声"></option>
-            <option value="zh-TW-HsiaoYuNeural" label="曉雨 · 台湾女声"></option>
-            <option value="zh-TW-YunJheNeural" label="雲哲 · 台湾男声"></option>
-          </datalist>
+          <span class="hint">直接下拉选择；没有想要的可以选“自定义”手动输入</span>
+          <select id="tts_voice">
+            <optgroup label="普通话 · 女声">
+              <option value="zh-CN-XiaoyiNeural">晓伊 · 活泼少女（推荐）</option>
+              <option value="zh-CN-XiaoxiaoNeural">晓晓 · 温柔女声（推荐）</option>
+              <option value="zh-CN-XiaochenNeural">晓辰 · 女声</option>
+              <option value="zh-CN-XiaohanNeural">晓涵 · 女声</option>
+              <option value="zh-CN-XiaomengNeural">晓梦 · 女声</option>
+              <option value="zh-CN-XiaomoNeural">晓墨 · 女声</option>
+              <option value="zh-CN-XiaoqiuNeural">晓秋 · 女声</option>
+              <option value="zh-CN-XiaoxuanNeural">晓萱 · 女声</option>
+              <option value="zh-CN-XiaoyanNeural">晓颜 · 女声</option>
+              <option value="zh-CN-XiaozhenNeural">晓甄 · 女声</option>
+            </optgroup>
+            <optgroup label="普通话 · 男声">
+              <option value="zh-CN-YunxiNeural">云希 · 阳光少年（推荐）</option>
+              <option value="zh-CN-YunjianNeural">云健 · 男声</option>
+              <option value="zh-CN-YunyangNeural">云扬 · 新闻男声</option>
+              <option value="zh-CN-YunyeNeural">云野 · 男声</option>
+            </optgroup>
+            <optgroup label="童声">
+              <option value="zh-CN-XiaoyouNeural">晓悠 · 童声</option>
+              <option value="zh-CN-XiaoshuangNeural">晓双 · 童声（Azure 付费，Edge 不可用）</option>
+              <option value="zh-CN-YunxiaNeural">云夏 · 男童</option>
+            </optgroup>
+            <optgroup label="老年 / 方言">
+              <option value="zh-CN-YunzeNeural">云泽 · 老年男声</option>
+              <option value="zh-CN-XiaoruiNeural">晓睿 · 老年女声</option>
+              <option value="zh-CN-liaoning-XiaobeiNeural">晓北 · 东北话</option>
+              <option value="zh-CN-shaanxi-XiaoniNeural">晓妮 · 陕西话</option>
+            </optgroup>
+            <optgroup label="粤语 / 台湾">
+              <option value="zh-HK-HiuGaaiNeural">曉佳 · 粤语女声</option>
+              <option value="zh-HK-HiuMaanNeural">曉曼 · 粤语女声</option>
+              <option value="zh-HK-WanLungNeural">雲龍 · 粤语男声</option>
+              <option value="zh-TW-HsiaoChenNeural">曉臻 · 台湾女声</option>
+              <option value="zh-TW-HsiaoYuNeural">曉雨 · 台湾女声</option>
+              <option value="zh-TW-YunJheNeural">雲哲 · 台湾男声</option>
+            </optgroup>
+            <option value="__custom__">自定义音色…</option>
+          </select>
+          <input id="tts_voice_custom" type="text" placeholder="例如 zh-CN-XiaoyiNeural" spellcheck="false" hidden>
           <span id="voice-warning" class="warning small" hidden>
             zh-CN-XiaoshuangNeural 是 Azure 付费音色，Edge TTS 免费接口里没有，会自动回退到备用音色。
           </span>
@@ -459,22 +468,62 @@
 
   function applyValues(values) {
     FIELDS.forEach((key) => {
+      if (key === "tts_voice") return;
       const el = $(key);
       if (!el) return;
       const value = values[key];
       el.value = (value === null || value === undefined) ? "" : String(value);
     });
+    applyVoice(values.tts_voice);
+  }
+
+  function currentVoice() {
+    const select = $("tts_voice");
+    if (select.value === "__custom__") {
+      return ($("tts_voice_custom").value || "").trim();
+    }
+    return (select.value || "").trim();
+  }
+
+  function applyVoice(value) {
+    const select = $("tts_voice");
+    const custom = $("tts_voice_custom");
+    const text = (value === null || value === undefined) ? "" : String(value);
+    let found = false;
+    for (let i = 0; i < select.options.length; i += 1) {
+      if (select.options[i].value === text) { found = true; break; }
+    }
+    if (found) {
+      select.value = text;
+      custom.value = "";
+      custom.hidden = true;
+    } else {
+      select.value = "__custom__";
+      custom.value = text;
+      custom.hidden = false;
+    }
+    updateVoiceWarning();
+  }
+
+  function syncVoiceCustom() {
+    const select = $("tts_voice");
+    const custom = $("tts_voice_custom");
+    const isCustom = select.value === "__custom__";
+    custom.hidden = !isCustom;
+    if (!isCustom) custom.value = "";
+    if (isCustom) custom.focus();
     updateVoiceWarning();
   }
 
   function updateVoiceWarning() {
-    const v = ($("tts_voice").value || "").trim();
+    const v = currentVoice();
     $("voice-warning").hidden = v !== "zh-CN-XiaoshuangNeural";
   }
 
   function markStatus(connected) {
     const pill = $("ws-pill");
-    pill.textContent = connected ? "QQ 已连接" : "QQ 未连接";
+    pill.textContent = connected ? "QQ 通道已连接" : "QQ 通道未连接";
+    pill.title = "Bot 与 NapCat 的 WebSocket 连接状态，不是 QQ 登录状态";
     pill.className = "pill " + (connected ? "ok" : "bad");
   }
 
@@ -527,7 +576,7 @@
       };
     }
     return {
-      tts_voice: v("tts_voice"),
+      tts_voice: currentVoice(),
       tts_rate: v("tts_rate"),
       tts_pitch: v("tts_pitch"),
       tts_volume: v("tts_volume")
@@ -652,7 +701,8 @@
   $("reset-ai").addEventListener("click", function () { resetSection("ai", "AI 设置"); });
   $("reset-tts").addEventListener("click", function () { resetSection("tts", "语音"); });
   $("test-ollama").addEventListener("click", function () { testOllama(this); });
-  $("tts_voice").addEventListener("input", updateVoiceWarning);
+  $("tts_voice").addEventListener("change", syncVoiceCustom);
+  $("tts_voice_custom").addEventListener("input", updateVoiceWarning);
 
   document.querySelectorAll(".tab").forEach(function (tab) {
     tab.addEventListener("click", function () {

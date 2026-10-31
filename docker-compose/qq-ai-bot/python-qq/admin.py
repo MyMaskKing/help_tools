@@ -32,6 +32,7 @@ SESSION_COOKIE = "qqbot_admin"
 SESSION_TTL = 12 * 3600
 PBKDF2_ITERATIONS = 200_000
 MAX_BODY = 512 * 1024
+ADMIN_VERSION = "1.2"
 
 SECTIONS = {
     "qq": ["ws_url", "ws_token"],
@@ -741,6 +742,7 @@ async def api_config(request):
         "sections": SECTIONS,
         "meta": {
             "password_fixed_by_env": store.password_fixed_by_env,
+            "version": ADMIN_VERSION,
         },
     })
 

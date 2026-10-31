@@ -108,6 +108,8 @@ flowchart LR
 
 如果你用普通用户，把文中所有 `/root` 换成 `/home/你的用户名`，并同步修改 `python-qq/docker-compose.yml` 里那行绝对路径（第 3.3 节会讲）。
 
+> 如果你沿用旧目录（例如 `/root/docker-compose/ai-bot/python-qq`），把文中所有 `qq-ai-bot/python-qq` 换成 `ai-bot/python-qq` 即可，其他配置不变。
+
 > 💡 路径不必和本文完全一样，但 **`python-qq/docker-compose.yml` 里挂载 NapCat 数据的绝对路径必须和真实路径一致**，这是新手最容易翻车的地方。
 
 ---
@@ -693,6 +695,29 @@ ssh -L 8080:127.0.0.1:8080 root@你的服务器IP
 http://127.0.0.1:8080
 ```
 
+#### 改后台端口 / 访问地址
+
+在 `python-qq/docker-compose.yml` 里改这两个环境变量，然后 `docker compose up -d`：
+
+```yaml
+      - WEB_HOST=0.0.0.0   # 只允许本机访问可改 127.0.0.1
+      - WEB_PORT=8080      # 被占用时改成 8090 等
+```
+
+不需要重新 `--build`，容器会重建并监听新端口。
+
+> ⚠️ `9090` 在不少 Linux 发行版上被 **Cockpit**（Web 控制台）占用；`8080` 也可能被别的面板占用。改端口前先查一下：
+>
+> ```bash
+> ss -lntp | grep -E ':8080|:9090|:18080'
+> ```
+>
+> 没有输出才是空闲。建议用 `18080`、`8899` 这类不常用的端口，避免和系统服务冲突。如果端口被占用，日志会打印“端口 xxxx 已被占用”，网页后台不会启动，但 QQ 收发不受影响。
+
+> 右上角的“QQ 通道已连接”表示 **Bot 到 NapCat 的 WebSocket 通了**，不是 QQ 号登录状态。QQ 是否登录要看 NapCat WebUI；NapCat 没启动或 WS 没启用时，这里会显示“未连接”。
+
+> 如果你要改的是 **NapCat 的 WS 端口**（默认宿主机 3010），需要同时改 `QQ/docker-compose-qq.yml` 的 `3010:3001` 映射和网页后台「QQ 连接」里的 `ws://127.0.0.1:3010`；只改一边会连不上。
+
 #### 第一次登录
 
 密码会打印在 Bot 启动日志里：
@@ -727,7 +752,7 @@ docker compose logs qwen-qq-bot | grep WEB
 
 - **AI 设置**里可以点「测试 Ollama 连接」，会显示连接是否成功、当前模型是否在模型列表里。
 - **人设提示词**就是 `SYSTEM_PROMPT`，改完保存即可；点「恢复默认」可以还原内置的女儿人设。
-- **音色**输入框内置了 20 多个常用中文音色（晓伊、晓晓、云希、云健、东北话、粤语、台湾腔等），点输入框右侧箭头选择，也可以直接输入任意 Edge TTS 音色名。
+- **音色**下拉框内置了 27 个常用中文音色（晓伊、晓晓、云希、云健、东北话、粤语、台湾腔等）；想用列表外的音色，选「自定义音色…」后手动输入 Edge TTS 音色名。
 - `zh-CN-XiaoshuangNeural`（晓双）是 Azure 付费音色，Edge TTS 免费接口里没有；选它时页面会提示，实际会自动回退到备用音色。
 - **QQ 连接**保存后，页面右上角的状态会短暂变成“未连接”，随后自动重连；如果一直连不上，检查 Token 和 NapCat 的网络配置。
 
@@ -1569,7 +1594,9 @@ dmesg | grep -i -E "oom|killed process"
 
 ### 12.12 网页后台相关
 
-**8080 打不开：**
+> 先确认你看的是新页面：页面顶部应显示 **管理后台 v1.2**。如果看不到版本号，说明浏览器缓存了旧 HTML，或者镜像里还是旧的 `admin.html`。
+
+**后台打不开：**
 
 ```bash
 # 1. 容器是否在跑
@@ -1578,7 +1605,7 @@ docker ps | grep qwen-qq-bot
 # 2. 后台有没有启动、端口是多少
 docker logs qwen-qq-bot 2>&1 | grep WEB
 
-# 3. 端口有没有监听
+# 3. 端口有没有监听（把 8080 换成你的 WEB_PORT）
 ss -lntp | grep 8080
 
 # 4. 服务器本机能不能访问
@@ -1586,8 +1613,41 @@ curl -I http://127.0.0.1:8080
 ```
 
 - 日志里有 `[WEB] admin listening on 0.0.0.0:8080`，但浏览器打不开 → 云安全组/防火墙没放行 8080，改用 SSH 隧道（6.5）。
-- 日志里有 `[WEB] 管理后台启动失败 ... Address already in use` → 8080 被占用，改 `WEB_PORT` 后 `docker compose up -d`。
+- 日志里有 `[WEB] 管理后台启动失败 ... Address already in use` → 端口被占用，见下方“端口被占用”。
 - 完全没有 `[WEB]` 日志 → 镜像还是旧的，`docker compose up -d --build` 重建。
+
+**端口被占用（Errno 98 / address already in use）：**
+
+- `9090` 常被 **Cockpit** 占用；`8080` 也可能被宝塔、1Panel、其他 Web 服务占用。
+- 先查是谁占的：
+
+  ```bash
+  ss -lntp | grep ':9090'
+  ps -fp <上面看到的 PID>
+  ```
+
+- 不要为了抢端口直接 kill 系统服务（Cockpit 关掉可能影响服务器管理）。直接换一个空闲端口，比如 `18080`：
+
+  ```bash
+  cd /root/docker-compose/qq-ai-bot/python-qq
+  # 编辑 docker-compose.yml，把 WEB_PORT 改成 18080
+  docker compose up -d
+  docker compose logs --tail=30 qwen-qq-bot | grep WEB
+  curl -I http://127.0.0.1:18080
+  ```
+
+- 如果 9090 上本来就开着别的管理页面，你访问到的可能**不是本 Bot 的后台**；以日志里的 `[WEB] admin listening on ...` 为准。
+
+**页面还是旧版 / 音色下拉框还是空的：**
+
+- 页面顶部应显示 `管理后台 v1.2`；没有就按 `Ctrl + F5` 强制刷新。
+- 仍然没有，确认服务器上的 `python-qq/admin.html` 已更新为最新文件，然后：
+
+  ```bash
+  docker compose up -d --build
+  ```
+
+- 新版音色是原生下拉框，直接点开就能看到 27 个音色；最后一项是「自定义音色…」。
 
 **密码不对 / 忘了密码：**
 
@@ -1612,7 +1672,7 @@ curl -I http://127.0.0.1:8080
 **改了配置但不生效：**
 
 1. 看日志有没有 `[WEB] 配置已更新: ...`；
-2. 改 QQ WS 后等 3～5 秒，右上角状态应重新变成“QQ 已连接”；一直连不上就检查 Token；
+2. 改 QQ WS 后等 3～5 秒，右上角状态应重新变成“QQ 通道已连接”；一直连不上就检查 Token；
 3. 改模型后点「测试 Ollama 连接」，确认 `model_found`；
 4. 改音色后下一条语音才生效；如果选的是 Xiaoshuang，会自动回退，属正常；
 5. 如果 compose 环境变量和后台值冲突，**后台值优先**，点「恢复默认」才会用环境变量。

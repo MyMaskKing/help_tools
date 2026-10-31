@@ -2162,13 +2162,36 @@ def event_task_done(task):
 whisper_model = None
 
 
+def ws_is_open(ws):
+    """
+    兼容 websockets 14/15。
+
+    新版 ClientConnection 没有 .closed，状态在 .state（State.OPEN）；
+    旧版/测试替身才用 .closed。
+    """
+
+    if ws is None:
+        return False
+
+    state = getattr(ws, "state", None)
+
+    if state is not None:
+        name = getattr(state, "name", None)
+
+        if name:
+            return name.upper() == "OPEN"
+
+        if isinstance(state, str):
+            return state.upper() == "OPEN"
+
+    return not getattr(ws, "closed", False)
+
+
 def get_bot_status():
     ws = active_ws
 
     return {
-        "ws_connected": bool(
-            ws is not None and not ws.closed
-        ),
+        "ws_connected": ws_is_open(ws),
         "ws_url": settings.get("ws_url"),
         "model": settings.get("ollama_model"),
         "voice": settings.get("tts_voice"),
@@ -2189,7 +2212,7 @@ async def reconnect_napcat():
         reconnect_pending = True
         return
 
-    if ws.closed:
+    if not ws_is_open(ws):
         return
 
     print(
@@ -2235,9 +2258,20 @@ async def main():
             },
         )
     except Exception as exc:
+        hint = ""
+
+        if (
+            isinstance(exc, OSError)
+            and getattr(exc, "errno", None) in (48, 98, 10048)
+        ):
+            hint = (
+                f" 端口 {WEB_PORT} 已被占用，"
+                "请修改 WEB_PORT 或停止占用该端口的程序。"
+            )
+
         print(
             f"[WEB] 管理后台启动失败（不影响 QQ）: "
-            f"{type(exc).__name__}: {exc}",
+            f"{type(exc).__name__}: {exc}{hint}",
             flush=True
         )
 
