@@ -2,8 +2,14 @@ version: '3.8'
 
 services:
   cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: cloudflared
+    # 💥 关键修改 1: 使用 'build' 代替 'image'
+    # Docker Compose 将自动构建同目录下的 Dockerfile
+    build:
+      context: . 
+      dockerfile: Dockerfile
+      # 建议为构建的镜像指定一个名称，方便管理
+    image: cloudflared_custom:latest 
+    container_name: cloudflared_custom
     restart: always  # 容器失败时自动重启
     network_mode: host  # 允许容器访问宿主机网络
     environment:
@@ -27,7 +33,10 @@ services:
 
     # 健康检查配置
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:2000/metrics"]
+      test: [
+        "CMD-SHELL",
+        "curl -s http://localhost:2000/metrics | grep -E '^cloudflared_tunnel_ha_connections [1-9]'"
+      ]
       interval: 30s  # 每30秒检查一次
       retries: 3  # 如果失败3次，Docker 会重启容器
       start_period: 10s  # 容器启动后，健康检查将在10秒后开始
