@@ -232,7 +232,7 @@
   <form id="login-form" class="card login-card" autocomplete="off">
     <h1>QQ AI 机器人</h1>
     <p class="muted">请输入管理密码。首次部署的密码会打印在容器启动日志里。</p>
-    <p class="muted small">管理后台 v1.3</p>
+    <p class="muted small">管理后台 v1.4</p>
     <label>管理密码
       <input id="login-password" type="password" autocomplete="current-password" required autofocus>
     </label>
@@ -243,7 +243,7 @@
 
 <div id="app" hidden>
   <header class="topbar">
-    <div class="brand">QQ AI 机器人<span>管理后台 v1.3</span></div>
+    <div class="brand">QQ AI 机器人<span>管理后台 v1.4</span></div>
     <div class="top-actions">
       <span id="ws-pill" class="pill">未连接</span>
       <button id="logout" class="ghost" type="button">退出</button>
@@ -296,12 +296,12 @@
           <input id="temperature" type="number" min="0" max="2" step="0.01">
         </label>
         <label>回复长度
-          <span class="hint">16～2048，单位 token</span>
+          <span class="hint">16～2048，单位 token；回复太短可调到 300</span>
           <input id="num_predict" type="number" min="16" max="2048" step="1">
         </label>
       </div>
       <label>人设提示词（System Prompt）
-        <span class="hint">决定机器人的身份、语气和边界。改坏了可以点“恢复默认”。</span>
+        <span class="hint">决定机器人的身份、语气和边界；回复太短可在末尾加“每次至少说两句话，给一个具体细节”</span>
         <textarea id="system_prompt" spellcheck="false"></textarea>
       </label>
       <div class="actions">
@@ -378,6 +378,7 @@
       </div>
       <div class="actions">
         <button id="save-tts" class="primary" type="button">保存语音设置</button>
+        <button id="test-tts" class="ghost" type="button">试听当前音色</button>
         <button id="reset-tts" class="ghost" type="button">恢复默认</button>
       </div>
     </section>
@@ -641,6 +642,47 @@
     }
   }
 
+  async function testTTS(button) {
+    button.disabled = true;
+    const oldText = button.textContent;
+    button.textContent = "正在生成…";
+    try {
+      const res = await fetch("/api/test/tts", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: "{}"
+      });
+      if (res.status === 401) {
+        showLogin();
+        throw new Error("请先登录");
+      }
+      if (!res.ok) {
+        let message = "试听失败";
+        try {
+          const data = await res.json();
+          message = data.error || message;
+        } catch (e) { /* ignore */ }
+        throw new Error(message);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = function () { URL.revokeObjectURL(url); };
+      audio.onerror = function () {
+        URL.revokeObjectURL(url);
+        toast("音频播放失败", true);
+      };
+      await audio.play();
+      toast("正在播放当前音色：" + currentVoice());
+    } catch (e) {
+      toast(e.message, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = oldText;
+    }
+  }
+
   async function testOllama(button) {
     button.disabled = true;
     const oldText = button.textContent;
@@ -717,6 +759,7 @@
   $("reset-ai").addEventListener("click", function () { resetSection("ai", "AI 设置"); });
   $("reset-tts").addEventListener("click", function () { resetSection("tts", "语音"); });
   $("test-ollama").addEventListener("click", function () { testOllama(this); });
+  $("test-tts").addEventListener("click", function () { testTTS(this); });
   $("tts_voice").addEventListener("change", function () {
     syncVoiceCustom();
     if (this.value !== "__custom__") {

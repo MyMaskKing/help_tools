@@ -179,6 +179,7 @@ docker compose up -d --build
 | POST | `/api/reset` | `{"section": "qq\|ai\|tts"}` |
 | GET | `/api/status` | WS 状态、模型、音色、运行时长（WS 指 Bot↔NapCat 通道） |
 | POST | `/api/test/ollama` | 可选 `{"ollama_url","ollama_model"}`；不传则用已保存值 |
+| POST | `/api/test/tts` | 用当前音色合成一句试听音频，返回 `audio/mpeg` |
 | POST | `/api/password` | 修改后台密码（`ADMIN_PASSWORD` 固定时禁用） |
 
 ### 安全设计

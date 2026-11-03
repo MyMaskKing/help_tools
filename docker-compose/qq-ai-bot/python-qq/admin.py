@@ -32,7 +32,7 @@ SESSION_COOKIE = "qqbot_admin"
 SESSION_TTL = 12 * 3600
 PBKDF2_ITERATIONS = 200_000
 MAX_BODY = 512 * 1024
-ADMIN_VERSION = "1.3"
+ADMIN_VERSION = "1.4"
 
 SECTIONS = {
     "qq": ["ws_url", "ws_token"],
@@ -932,6 +932,40 @@ async def api_test_ollama(request):
 
 
 @require_auth
+async def api_test_tts(request):
+    hook = request.app["hooks"].get("test_tts")
+
+    if not hook:
+        return _error("当前版本不支持试听", 501)
+
+    try:
+        result = hook("你好，我是你的女儿，声音已经换成新的啦。")
+
+        if inspect.isawaitable(result):
+            result = await result
+
+        filename, path = result
+        data = Path(path).read_bytes()
+
+    except Exception as exc:
+        return _error(
+            f"{type(exc).__name__}: {exc}",
+            502,
+        )
+
+    print(
+        f"[WEB] TTS sample generated: {filename}",
+        flush=True,
+    )
+
+    return web.Response(
+        body=data,
+        content_type="audio/mpeg",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@require_auth
 async def api_password(request):
     store = request.app["store"]
 
@@ -978,6 +1012,7 @@ async def security_headers(request, handler):
     response.headers.setdefault(
         "Content-Security-Policy",
         "default-src 'self'; img-src 'self' data:; "
+        "media-src 'self' blob:; "
         "style-src 'self' 'unsafe-inline'; "
         "script-src 'self' 'unsafe-inline'; "
         "connect-src 'self'",
@@ -1006,6 +1041,10 @@ def build_app(store, hooks=None):
     app.router.add_post(
         "/api/test/ollama",
         require_auth(api_test_ollama),
+    )
+    app.router.add_post(
+        "/api/test/tts",
+        require_auth(api_test_tts),
     )
     app.router.add_post(
         "/api/password",
