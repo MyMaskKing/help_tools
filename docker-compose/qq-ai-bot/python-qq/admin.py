@@ -32,7 +32,7 @@ SESSION_COOKIE = "qqbot_admin"
 SESSION_TTL = 12 * 3600
 PBKDF2_ITERATIONS = 200_000
 MAX_BODY = 512 * 1024
-ADMIN_VERSION = "1.2"
+ADMIN_VERSION = "1.3"
 
 SECTIONS = {
     "qq": ["ws_url", "ws_token"],
@@ -784,6 +784,12 @@ async def api_save(request):
             f"[WEB] 配置已更新: {', '.join(changed)}",
             flush=True,
         )
+
+        if "tts_voice" in changed:
+            print(
+                f"[WEB] TTS voice -> {store.get('tts_voice')}",
+                flush=True,
+            )
 
     return web.json_response({
         "ok": True,

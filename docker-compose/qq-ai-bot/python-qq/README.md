@@ -160,7 +160,7 @@ docker compose up -d --build
 | --- | --- | --- |
 | QQ 连接 | `ws_url` / `ws_token` | 保存后关闭当前 WS 并用新配置重连 |
 | AI | `ollama_url` / `ollama_model` / `temperature` / `num_predict` / `system_prompt` | 下一条消息生效 |
-| 语音 | `tts_voice` / `tts_rate` / `tts_pitch` / `tts_volume` | 下一条语音生效 |
+| 语音 | `tts_voice` / `tts_rate` / `tts_pitch` / `tts_volume` | 下一条语音生效；预设音色在网页里选中即自动保存 |
 
 - 覆盖值写入 `data/bot.db` 的 `settings` 表，重启不丢；
 - 点「恢复默认」删除对应分区的覆盖值，回退到环境变量；
@@ -298,15 +298,23 @@ docker compose up -d --build
 
 ### 改回复长度 / 温度
 
-优先在网页后台「AI 设置」改，字段是 `num_predict`（默认 220）和 `temperature`（默认 0.78）。
+优先在网页后台「AI 设置」改，字段是 `num_predict`（默认 220）和 `temperature`（默认 0.82）。采样参数 `top_p=0.90`、`repeat_penalty=1.12` 在 `ollama_chat()` 里固定。
 
 ### 改 QQ WS
 
 优先在网页后台「QQ 连接」改，保存后自动重连；不需要重启容器。
 
-### 改主动陪伴时间
+### 改主动陪伴时间 / 话题
 
-`PROACTIVE_SLOTS` 里的 `start` / `end`；闲置时长是 `IDLE_HOURS`（默认 4 小时）。
+时间段在 `PROACTIVE_SLOTS` 的 `start` / `end`；闲置时长是 `IDLE_HOURS`（默认 4 小时）。
+
+主动话题池在 `PROACTIVE_TOPIC_BANK`（按早/中/晚分组），`pick_proactive_topic()` 会：
+
+1. 扫描最近 6 条聊天里的关键词，避开刚聊过的方向；
+2. 避开 `LAST_PROACTIVE_TOPICS` 里该用户上一次的话题；
+3. 把选中话题写进提示词，并明确要求“不要接着最后一句继续”。
+
+想加话题，往对应时间段的列表里加 `{id, label, keywords}` 即可。
 
 ### 在容器里调试
 
@@ -337,6 +345,8 @@ docker compose config
 - 群聊只处理 @ 消息，且只回文字，不识别群语音。
 - 语音识别针对中文优化，其他语言效果差。
 - CPU 推理 1.5B 模型通常 2～15 秒一条回复，属正常。
+- 1.5B 模型能力有限；提示词和采样参数只能改善，不会变成 7B。内存 8G 以上建议换 `qwen2.5:3b`。
+- 主动话题用“时间段话题池 + 最近关键词 + 上次话题”做选择，不是真正的语义理解，但能避免总接最后一句话。
 - 默认只回文字；发语音不等于回语音，要显式要求或开启持续语音模式。
 - `tiny` 模型识别率一般，噪音环境下容易听错，可换 `small`。
 - 网页后台只提供 HTTP，没有 HTTPS；请用 SSH 隧道或限制来源 IP。
@@ -356,6 +366,9 @@ docker compose config
 6. **WebSocket 断开后请求干等 45 秒**：断开时让挂起请求立即失败。
 7. **主动陪伴日志刷屏**：只在进入/离开时间段时打印。
 8. **语音模式否定语义错误**：“不要关闭语音模式”不再被当成关闭命令。
+9. **主动陪伴总接最后一句话**：按时间段话题池 + 最近关键词 + 上次话题选方向，不再把整段对话塞给模型。
+10. **网页换音色不生效**：音色改为每次合成时读取；预设音色选中即自动保存，并打印 `[WEB] TTS voice -> ...`。
+11. **低配模型偏笨/偏死板**：新增“思考方式”和表达示例，温度默认调到 0.82，`top_p`/`repeat_penalty` 调整，减少复读。
 
 新增的环境变量：`TTS_VOICE_CANDIDATES`、`AUDIO_CLEANUP_MAX_AGE`、`AUDIO_CLEANUP_INTERVAL`、`ASR_MIN_LOGPROB`、`ASR_MAX_NO_SPEECH`。
 

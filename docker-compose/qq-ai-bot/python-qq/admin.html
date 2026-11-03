@@ -232,7 +232,7 @@
   <form id="login-form" class="card login-card" autocomplete="off">
     <h1>QQ AI 机器人</h1>
     <p class="muted">请输入管理密码。首次部署的密码会打印在容器启动日志里。</p>
-    <p class="muted small">管理后台 v1.2</p>
+    <p class="muted small">管理后台 v1.3</p>
     <label>管理密码
       <input id="login-password" type="password" autocomplete="current-password" required autofocus>
     </label>
@@ -243,7 +243,7 @@
 
 <div id="app" hidden>
   <header class="topbar">
-    <div class="brand">QQ AI 机器人<span>管理后台 v1.2</span></div>
+    <div class="brand">QQ AI 机器人<span>管理后台 v1.3</span></div>
     <div class="top-actions">
       <span id="ws-pill" class="pill">未连接</span>
       <button id="logout" class="ghost" type="button">退出</button>
@@ -288,11 +288,11 @@
           <input id="ollama_url" spellcheck="false">
         </label>
         <label>模型名
-          <span class="hint">必须和 <code>ollama list</code> 里的名字完全一致</span>
+          <span class="hint">必须和 <code>ollama list</code> 里的名字完全一致；低配 1.5B 建议 8G 内存时换 qwen2.5:3b</span>
           <input id="ollama_model" spellcheck="false">
         </label>
         <label>温度
-          <span class="hint">0～2，越高回答越发散</span>
+          <span class="hint">0～2，建议 0.75～0.9；太高会胡言乱语</span>
           <input id="temperature" type="number" min="0" max="2" step="0.01">
         </label>
         <label>回复长度
@@ -314,10 +314,10 @@
 
     <section id="panel-tts" class="card panel" hidden>
       <h2>语音</h2>
-      <p class="muted">修改后下一条语音生效。Edge TTS 是免费接口，推荐使用中文音色。</p>
+      <p class="muted">修改后下一条语音生效。音色只影响语音回复，普通文字消息不会发语音。</p>
       <div class="grid">
         <label>音色
-          <span class="hint">直接下拉选择；没有想要的可以选“自定义”手动输入</span>
+          <span class="hint">选预设音色会自动保存；自定义音色输入后点保存</span>
           <select id="tts_voice">
             <optgroup label="普通话 · 女声">
               <option value="zh-CN-XiaoyiNeural">晓伊 · 活泼少女（推荐）</option>
@@ -609,6 +609,22 @@
     }
   }
 
+  async function saveVoiceOnly(voice) {
+    if (!voice) return;
+    try {
+      const res = await api("/api/save", {
+        method: "POST",
+        body: JSON.stringify({ values: { tts_voice: voice } })
+      });
+      state.values = res.values || state.values;
+      applyVoice(res.values.tts_voice);
+      toast("音色已切换：" + res.values.tts_voice + "（下一条语音生效）");
+      refreshStatus();
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
   async function resetSection(name, label) {
     if (!window.confirm("确定把「" + label + "」恢复成默认值吗？")) return;
     try {
@@ -701,8 +717,17 @@
   $("reset-ai").addEventListener("click", function () { resetSection("ai", "AI 设置"); });
   $("reset-tts").addEventListener("click", function () { resetSection("tts", "语音"); });
   $("test-ollama").addEventListener("click", function () { testOllama(this); });
-  $("tts_voice").addEventListener("change", syncVoiceCustom);
+  $("tts_voice").addEventListener("change", function () {
+    syncVoiceCustom();
+    if (this.value !== "__custom__") {
+      saveVoiceOnly(this.value);
+    }
+  });
   $("tts_voice_custom").addEventListener("input", updateVoiceWarning);
+  $("tts_voice_custom").addEventListener("change", function () {
+    const voice = this.value.trim();
+    if (voice) saveVoiceOnly(voice);
+  });
 
   document.querySelectorAll(".tab").forEach(function (tab) {
     tab.addEventListener("click", function () {

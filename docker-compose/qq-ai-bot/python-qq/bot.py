@@ -26,6 +26,7 @@ QQ 女儿 Bot（NapCat + Ollama + faster-whisper + edge-tts）
 import asyncio
 import json
 import os
+import random
 import re
 import sqlite3
 import time
@@ -113,6 +114,95 @@ PROACTIVE_SLOTS = {
 DEFAULT_ROLE = "乖巧可爱的女儿"
 MAX_ROLE_LENGTH = 100
 
+
+# 主动陪伴的话题池：按时间段给不同方向，避免每次都接着最后一句话。
+PROACTIVE_TOPIC_BANK = {
+    "morning": [
+        {
+            "id": "sleep",
+            "label": "昨晚睡得怎么样",
+            "keywords": ("睡", "困", "熬夜", "失眠", "早醒", "梦"),
+        },
+        {
+            "id": "breakfast",
+            "label": "早餐吃了什么",
+            "keywords": ("早餐", "早饭", "包子", "牛奶", "面包", "饿"),
+        },
+        {
+            "id": "schedule",
+            "label": "今天有什么安排",
+            "keywords": ("今天", "安排", "上班", "上课", "开会", "出门", "忙"),
+        },
+        {
+            "id": "weather",
+            "label": "今天天气怎么样",
+            "keywords": ("天气", "下雨", "降温", "冷", "热", "太阳", "风"),
+        },
+        {
+            "id": "body",
+            "label": "最近身体状态",
+            "keywords": ("累", "头疼", "不舒服", "感冒", "运动", "健身", "腰", "眼睛"),
+        },
+    ],
+    "noon": [
+        {
+            "id": "lunch",
+            "label": "午饭吃了什么",
+            "keywords": ("午饭", "中午", "外卖", "食堂", "吃", "饿"),
+        },
+        {
+            "id": "morning_work",
+            "label": "上午忙不忙",
+            "keywords": ("上午", "忙", "工作", "开会", "上课", "累"),
+        },
+        {
+            "id": "rest",
+            "label": "中午有没有休息",
+            "keywords": ("午休", "休息", "睡", "躺", "困"),
+        },
+        {
+            "id": "afternoon",
+            "label": "下午有什么安排",
+            "keywords": ("下午", "安排", "开会", "出门", "忙"),
+        },
+        {
+            "id": "water",
+            "label": "有没有记得喝水",
+            "keywords": ("水", "喝", "渴", "咖啡", "茶"),
+        },
+    ],
+    "evening": [
+        {
+            "id": "dinner",
+            "label": "晚饭吃了什么",
+            "keywords": ("晚饭", "晚上", "外卖", "做饭", "吃", "饿"),
+        },
+        {
+            "id": "day",
+            "label": "今天过得怎么样",
+            "keywords": ("今天", "过得", "发生", "顺利", "忙"),
+        },
+        {
+            "id": "mood",
+            "label": "今天心情怎么样",
+            "keywords": ("心情", "开心", "难过", "烦", "累", "压力"),
+        },
+        {
+            "id": "weekend",
+            "label": "周末有什么打算",
+            "keywords": ("周末", "明天", "计划", "出去", "玩"),
+        },
+        {
+            "id": "hobby",
+            "label": "最近在玩什么、看什么",
+            "keywords": ("游戏", "电影", "剧", "音乐", "书", "运动", "动漫"),
+        },
+    ],
+}
+
+# 每个用户上一次主动聊的话题，进程内轮换，避免连续两次一样。
+LAST_PROACTIVE_TOPICS = {}
+
 NAPCAT_PATH_PREFIX = os.getenv(
     "NAPCAT_PATH_PREFIX",
     "/app/.config/QQ"
@@ -192,6 +282,19 @@ SYSTEM_PROMPT = """
 - 避免重复上一条回答的句式、内容和开场白。
 - 用户难过时先共情；用户开心时分享喜悦；适当关心，但不制造愧疚或依赖。
 
+【思考方式】
+- 回复前先在心里判断：爸爸这句话的情绪、真实需求、和上一句的关系，再决定怎么接。
+- 回答尽量具体：给一个细节、一个例子或一个自然的小问题，不要只回“嗯嗯”“加油”“好的”。
+- 可以主动延伸一个相关的小话题，但不要连续追问、不要抢话。
+- 允许有自己的小情绪、小观点和小幽默，像真人，不要像客服。
+- 不确定时先问清楚，不要编造爸爸没说过的事。
+
+【表达示例】
+爸爸：今天好累。
+你：那就先别硬撑啦，泡个脚早点休息？今天是工作累到了，还是没睡好呀。
+爸爸：周末好无聊。
+你：要不要找点小事做？下楼走走、找家没吃过的店，或者在家看部轻松的片子。
+
 【语音表达风格】
 - 说话像一个软糯、稚嫩、甜甜的小女孩，声音表达轻柔、自然。
 - 语气亲近、乖巧，偶尔带一点撒娇感，但不要刻意装幼稚。
@@ -215,7 +318,7 @@ DEFAULT_SETTINGS = {
     "ws_token": WS_TOKEN,
     "ollama_url": OLLAMA_URL,
     "ollama_model": OLLAMA_MODEL,
-    "temperature": 0.78,
+    "temperature": 0.82,
     "num_predict": 220,
     "system_prompt": SYSTEM_PROMPT,
     "tts_voice": TTS_VOICE,
@@ -837,8 +940,8 @@ async def ollama_chat(
         "stream": False,
         "options": {
             "temperature": temperature,
-            "top_p": 0.88,
-            "repeat_penalty": 1.18,
+            "top_p": 0.90,
+            "repeat_penalty": 1.12,
             "repeat_last_n": 96,
             "num_ctx": 2048,
             "num_predict": num_predict
@@ -881,7 +984,8 @@ async def ask_ai(http, key, question):
         "role": "system",
         "content": (
             "请直接回答刚刚用户最新一条消息。"
-            "不要重复上一轮回答；若是反问，结合上下文理解其指向。"
+            "先接住爸爸的情绪或问题，再给一个具体的回应；"
+            "不要复述问题，不要客服腔；若是反问，结合上下文理解其指向。"
         )
     })
 
@@ -1054,6 +1158,14 @@ async def synthesize_tts(text):
     for voice in [settings.get("tts_voice"), *TTS_VOICE_CANDIDATES]:
         if voice and voice not in voices:
             voices.append(voice)
+
+    print(
+        f"[TTS] voices={voices} "
+        f"rate={settings.get('tts_rate')} "
+        f"pitch={settings.get('tts_pitch')} "
+        f"volume={settings.get('tts_volume')}",
+        flush=True
+    )
 
     last_error = None
 
@@ -1494,6 +1606,36 @@ async def send_proactive_message(
 
 # ==================== 主动陪伴 ====================
 
+def pick_proactive_topic(user_id, slot_id, history):
+    """按时间段和最近聊天内容挑一个话题，避免总接最后一句话。"""
+
+    topics = PROACTIVE_TOPIC_BANK.get(slot_id)
+
+    if not topics:
+        return None
+
+    recent = " ".join(
+        str(item.get("content", ""))
+        for item in history[-6:]
+    )
+    last_id = LAST_PROACTIVE_TOPICS.get(str(user_id))
+    scored = []
+
+    for topic in topics:
+        hits = sum(
+            1 for keyword in topic["keywords"]
+            if keyword in recent
+        )
+
+        if topic["id"] == last_id:
+            hits += 3
+
+        scored.append((hits, random.random(), topic))
+
+    scored.sort(key=lambda item: (item[0], item[1]))
+    return scored[0][2]
+
+
 async def generate_proactive_message(
     http,
     user_id,
@@ -1541,38 +1683,73 @@ async def generate_proactive_message(
         return None
 
     slot = PROACTIVE_SLOTS[slot_id]
+    topic = pick_proactive_topic(user_id, slot_id, normalized_history)
 
-    msgs = [{
-        "role": "system",
-        "content": make_system_prompt(key) + f"""
+    if topic is None:
+        return None
+
+    older = (
+        normalized_history[:-2]
+        if len(normalized_history) > 2
+        else []
+    )
+    background = "\n".join(
+        f"{'爸爸' if item['role'] == 'user' else '你'}："
+        f"{item['content'][:80]}"
+        for item in older[-6:]
+    ) or "（没有更早的记录）"
+
+    plan = f"""
 现在是主动陪伴时间段：{slot["name"]}。
 
 {slot["instruction"]}
 
-请根据最近聊天内容，自然地向爸爸发起一次聊天。
+【本次话题计划】
+建议话题：{topic["label"]}
+最近一次聊天：已刻意省略，禁止接着最后一句继续说，也不要猜测或延续它的具体内容，把它当成已经翻篇。
+
+更早的聊天背景（只作参考，不要逐句复述）：
+{background}
+
+请围绕「{topic["label"]}」重新发起一次关心，而不是延续上面的最后一次对话。
 
 要求：
 1. 像女儿主动关心爸爸，不要像客服。
 2. 不要假装知道爸爸此刻在做什么。
 3. 不要使用“在吗”“怎么不理我”等表达。
 4. 不要制造愧疚感，不要要求爸爸必须回复。
-5. 避免重复最近已经问过的问题。
+5. 不要重复最近已经问过的问题。
 6. 只生成一条20-60字以内的自然消息。
 7. 不要加引号，不要输出解释。
 """
-    }] + normalized_history
+
+    msgs = [{
+        "role": "system",
+        "content": make_system_prompt(key) + plan
+    }]
 
     try:
         answer = await ollama_chat(
             http,
             msgs,
-            temperature=0.9,
+            temperature=0.95,
             num_predict=90
         )
 
         answer = clean_answer(answer)
 
-        return answer or None
+        if not answer:
+            return None
+
+        LAST_PROACTIVE_TOPICS[str(user_id)] = topic["id"]
+
+        print(
+            f"[PROACTIVE] user={user_id} "
+            f"slot={slot_id} topic={topic['label']}",
+            flush=True
+        )
+
+        return answer
 
     except asyncio.CancelledError:
         raise
